@@ -1,0 +1,134 @@
+@startuml Map Routing System
+
+' Use better styling
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classBackgroundColor White
+skinparam classBorderColor Black
+skinparam arrowColor Black
+
+' Main data structures
+class Node {
+  +int id
+  +double x
+  +double y
+}
+
+class Edge {
+  +int source
+  +int destination
+  +double distance
+  +double speed
+}
+
+class PathResult {
+  +vector<int> path
+  +double travelTime
+  +double distance
+  +double directDistance
+  +string resultText
+}
+
+' MapGraph class
+class MapGraph {
+  -vector<Node> nodes
+  -vector<Edge> edges
+  -vector<vector<pair<int, double>>> adjacencyList
+  -unordered_map<string, int> edgeMap
+  -unordered_map<int, pair<double, double>> nodePositions
+  -vector<Query> queries
+  -vector<int> lastPath
+  -double lastTravelTime
+  -double lastDistance
+  -double lastDirectDistance
+  
+  +MapGraph()
+  +~MapGraph()
+  +bool loadMapFromFile(string filename)
+  +bool loadQueriesFromFile(string filename)
+  +string findShortestPath(double startX, double startY, double endX, double endY, double maxSpeed)
+  +string compareWithOutput(string outputFilename)
+  +vector<PathResult> runAllQueries()
+  +const vector<Node>& getNodes() const
+  +const vector<Edge>& getEdges() const
+  +const vector<int>& getLastPath() const
+  +int findClosestNode(double x, double y) const
+  -double calculateDistance(double x1, double y1, double x2, double y2) const
+}
+
+' MapVisualizer class
+class MapVisualizer {
+  -shared_ptr<MapGraph> mapGraph
+  -QPointF startPoint
+  -QPointF endPoint
+  -bool isStartPointSelected
+  -double nodeDiameter
+  -double pathThickness
+  -QColor nodeColor
+  -QColor edgeColor
+  -QColor pathColor
+  -QColor selectedNodeColor
+  -QColor startPointColor
+  -QColor endPointColor
+  
+  +MapVisualizer(QWidget *parent)
+  +~MapVisualizer()
+  +void setMapGraph(shared_ptr<MapGraph> graph)
+  +void reset()
+  +void clearSelectionPoints()
+  +QPointF getStartPoint() const
+  +QPointF getEndPoint() const
+  #void paintEvent(QPaintEvent *event)
+  #void mousePressEvent(QMouseEvent *event)
+  #void mouseMoveEvent(QMouseEvent *event)
+}
+
+' Main window class
+class MainWindow {
+  -Ui::MainWindow *ui
+  -shared_ptr<MapGraph> mapGraph
+  -MapVisualizer *mapVisualizer
+  -QTextEdit *outputTextEdit
+  -QLabel *mapPathLabel
+  -QLabel *queriesPathLabel
+  -QLabel *outputPathLabel
+  -QLineEdit *maxSpeedEdit
+  -QString mapFilePath
+  -QString queriesFilePath
+  -QString outputFilePath
+  
+  +MainWindow(QWidget *parent)
+  +~MainWindow()
+  -void setupUi()
+  -void loadMapFile()
+  -void loadQueriesFile()
+  -void compareOutputFile()
+  -void findShortestPath()
+  -void onPointsSelected(double startX, double startY, double endX, double endY)
+  -void runAllQueries()
+  -void displayResult(const QString &result)
+}
+
+' Inner class
+class "MapGraph::Query" as Query {
+  +double startX
+  +double startY
+  +double endX
+  +double endY
+  +double maxSpeed
+}
+
+' Relationships
+MapGraph *-- Node : contains
+MapGraph *-- Edge : contains
+MapGraph *-- Query : contains
+MapGraph *-- PathResult : produces
+
+MainWindow *-- MapVisualizer : contains
+MainWindow *-- MapGraph : contains
+
+MapVisualizer o-- MapGraph : references
+
+@enduml 
