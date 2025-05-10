@@ -141,7 +141,8 @@ bool MapGraph::loadQueriesFromFile(const std::string& filename) {
         for (int i = 0; i < numQueries; i++) {
             Query q;
             file >> q.startX >> q.startY >> q.endX >> q.endY >> q.R;
-            
+            q.R/=1000; // Convert to km
+
             // Check for invalid query data
             if (file.fail()) {
                 std::cerr << "Error reading query data at index " << i << std::endl;
@@ -370,13 +371,13 @@ PathResult MapGraph::findShortestPath(double startX, double startY, double endX,
         lastPath = path;
         result.path = path;
     }
-    
-    // Calculate travel time (already computed during Dijkstra)
-    result.travelTime = time[endNode];
 
     // Calculate walking distance
     result.walkingDistance = startWalking + endWalking;
-    
+
+    // Calculate travel time (already computed during Dijkstra + time of walking distance)
+    result.travelTime = time[endNode] + (result.walkingDistance/5)*60;
+
     // Calculate vehicle path distance (already computed during Dijkstra)
     result.vehicleDistance = dist[endNode];
 
