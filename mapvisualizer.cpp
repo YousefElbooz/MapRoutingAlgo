@@ -4,10 +4,10 @@
 MapVisualizer::MapVisualizer(QWidget *parent)
     : QWidget(parent),
       isStartPointSelected(false),
-      nodeDiameter(0.25),
-      pathThickness(100),
+      nodeDiameter(0),
+      pathThickness(2),
       nodeColor(Qt::blue),
-      edgeColor(Qt::gray),
+      edgeColor(Qt::black),
       pathColor(Qt::red),
       selectedNodeColor(Qt::green),
       startPointColor(Qt::green),
@@ -57,47 +57,49 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
         painter.drawText(rect(), Qt::AlignCenter, "No map loaded");
         return;
     }
+
+    std::vector<std::pair<double, double>> nodes = mapGraph->getNodes();
     
     // Draw edges
     painter.setPen(QPen(edgeColor, 1));
     for (const auto& edge : mapGraph->getEdges()) {
-        const auto& source = mapGraph->getNodes()[edge.source];
-        const auto& dest = mapGraph->getNodes()[edge.destination];
+        const auto& source = nodes[edge.first];
+        const auto& dest = nodes[edge.second];
         
-        QPointF sourcePoint = transformCoordinates(source.x, source.y);
-        QPointF destPoint = transformCoordinates(dest.x, dest.y);
+        QPointF sourcePoint = transformCoordinates(source.first, source.second);
+        QPointF destPoint = transformCoordinates(dest.first, dest.second);
         
         painter.drawLine(sourcePoint, destPoint);
     }
     
-    // Draw shortest path if available
+    //Draw shortest path if available
     const auto& path = mapGraph->getLastPath();
     if (!path.empty()) {
         painter.setPen(QPen(pathColor, pathThickness));
         
         for (size_t i = 0; i < path.size() - 1; ++i) {
-            const auto& source = mapGraph->getNodes()[path[i]];
-            const auto& dest = mapGraph->getNodes()[path[i+1]];
+            const auto& source = nodes[path[i]];
+            const auto& dest = nodes[path[i+1]];
             
-            QPointF sourcePoint = transformCoordinates(source.x, source.y);
-            QPointF destPoint = transformCoordinates(dest.x, dest.y);
+            QPointF sourcePoint = transformCoordinates(source.first, source.second);
+            QPointF destPoint = transformCoordinates(dest.first, dest.second);
             
             painter.drawLine(sourcePoint, destPoint);
         }
     }
     
     // Draw nodes
-    for (const auto& node : mapGraph->getNodes()) {
-        QPointF center = transformCoordinates(node.x, node.y);
+    for (const auto& coords : nodes) {
+        QPointF center = transformCoordinates(coords.first, coords.second);
         
         // Check if this node is in the path
         bool isInPath = false;
-        for (const auto& pathNode : path) {
-            if (node.id == pathNode) {
-                isInPath = true;
-                break;
-            }
-        }
+        // for (const auto& pathNode : path) {
+        //     if (node.first == pathNode) {
+        //         isInPath = true;
+        //         break;
+        //     }
+        // }
         
         if (isInPath) {
             painter.setBrush(selectedNodeColor);
@@ -219,11 +221,11 @@ void MapVisualizer::calculateGraphBounds() {
     double maxX = std::numeric_limits<double>::lowest();
     double maxY = std::numeric_limits<double>::lowest();
     
-    for (const auto& node : mapGraph->getNodes()) {
-        minX = qMin(minX, node.x);
-        minY = qMin(minY, node.y);
-        maxX = qMax(maxX, node.x);
-        maxY = qMax(maxY, node.y);
+    for (const auto& coords : mapGraph->getNodes()) {
+        minX = qMin(minX, coords.first);
+        minY = qMin(minY, coords.second);
+        maxX = qMax(maxX, coords.first);
+        maxY = qMax(maxY, coords.second);
     }
     
     // Add some padding

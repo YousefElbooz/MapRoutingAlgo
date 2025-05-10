@@ -46,7 +46,7 @@ private:
     QLabel *mapPathLabel;
     QLabel *queriesPathLabel;
     QLabel *outputPathLabel;
-    QLineEdit *maxSpeedEdit;
+    QLineEdit *REdit;
     
     QString mapFilePath;
     QString queriesFilePath;

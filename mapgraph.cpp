@@ -1,11 +1,19 @@
 #include "mapgraph.h"
+#include "qminmax.h"
 #include <iomanip>
-#include <unordered_map>
 #include <chrono>
+#include <queue>
+#include <algorithm>
+#include <fstream>
+#include <iostream>
 
 MapGraph::MapGraph() {}
 
 MapGraph::~MapGraph() {}
+
+bool MapGraph::empty() {
+    return adjacencyList.empty();
+}
 
 bool MapGraph::loadMapFromFile(const std::string& filename) {
     std::ifstream file(filename);
@@ -16,10 +24,9 @@ bool MapGraph::loadMapFromFile(const std::string& filename) {
 
     try {
         // Clear previous data
-        nodes.clear();
+        nodePositions.clear();
         edges.clear();
         adjacencyList.clear();
-        edgeMap.clear(); // Clear edge lookup map
     
         // Read number of nodes
         int numNodes;
@@ -31,8 +38,8 @@ bool MapGraph::loadMapFromFile(const std::string& filename) {
         }
         
         // Reserve capacity to avoid reallocations
-        nodes.reserve(numNodes);
-        
+        nodePositions.reserve(numNodes);
+
         // Read node information
         for (int i = 0; i < numNodes; i++) {
             Node node;
@@ -44,31 +51,56 @@ bool MapGraph::loadMapFromFile(const std::string& filename) {
                 return false;
             }
             
-            nodes.push_back(node);
-            
             // Create spatial index for faster lookups
-            nodePositions[node.id] = {node.x, node.y};
+            nodePositions.push_back({node.x, node.y});
         }
         
         // Read number of edges
         int numEdges;
-        file >> numEdges;
-        
-        if (numEdges <= 0 || numEdges > 10000000) { // Sanity check for edge count
-            std::cerr << "Invalid number of edges: " << numEdges << std::endl;
-            return false;
+        speedCount = 1;
+        speedInterval = 0.0;
+        std::string line;
+        std::getline(file >> std::ws, line); // read the next non-empty line
+
+        std::istringstream edge(line);
+
+        edge >> numEdges;
+
+        if (edge >> speedCount >> speedInterval) {
+            // Bonus case
+            std::cerr << "Bonus case: numEdges = " << numEdges
+                      << ", speedCount = " << speedCount
+                      << ", speedInterval = " << speedInterval << std::endl;
+        } else {
+            // Normal case
+            std::cerr << "Normal case: numEdges = " << numEdges << std::endl;
         }
+
+
+        // if (numEdges <= 0 || numEdges > 10000000) { // Sanity check for edge count
+        //     std::cerr << "Invalid number of edges: " << numEdges << std::endl;
+        //     return false;
+        // }
         
         // Reserve capacity
         edges.reserve(numEdges);
-        
+
         // Initialize adjacency list
         adjacencyList.resize(numNodes);
         
+        max_speed = 0;
         // Read edge information
         for (int i = 0; i < numEdges; i++) {
+            int source, destination;
             Edge edge;
-            file >> edge.source >> edge.destination >> edge.distance >> edge.speed;
+            file >> source >> destination >> edge.distance;
+
+            edge.speeds.resize(speedCount);
+
+            for (int i = 0; i < speedCount; ++i){
+                file >> edge.speeds[i];
+                max_speed = qMax(max_speed, edge.speeds[i]);
+            }
             
             // Check for invalid edge data
             if (file.fail()) {
@@ -77,30 +109,22 @@ bool MapGraph::loadMapFromFile(const std::string& filename) {
             }
             
             // Validate edge data
-            if (edge.source < 0 || edge.source >= numNodes || 
-                edge.destination < 0 || edge.destination >= numNodes ||
-                edge.distance < 0 || edge.speed <= 0) {
-                std::cerr << "Invalid edge data at index " << i << ": " 
-                          << edge.source << " " << edge.destination << " "
-                          << edge.distance << " " << edge.speed << std::endl;
-                continue; // Skip invalid edge
-            }
+            // if (edge.source < 0 || edge.source >= numNodes ||
+            //     edge.destination < 0 || edge.destination >= numNodes ||
+            //     edge.distance < 0 || edge.speed <= 0) {
+            //     std::cerr << "Invalid edge data at index " << i << ": "
+            //               << source << " " << destination << " "
+            //               << distance << std::endl;
+            //     continue; // Skip invalid edge
+            // }
             
-            edges.push_back(edge);
-            
-            // Calculate travel time (in minutes): distance(km) / speed(km/h) * 60
-            double travelTime = (edge.distance / edge.speed) * 60.0;
-            
+            edges.push_back({source,destination});
+
             // Update adjacency list
-            adjacencyList[edge.source].push_back({edge.destination, travelTime});
+            adjacencyList[source].push_back({destination, edge});
             // Assuming bidirectional edges
-            adjacencyList[edge.destination].push_back({edge.source, travelTime});
-            
-            // Add to edge map for faster lookups - store edge index
-            std::string edgeKey1 = std::to_string(edge.source) + "_" + std::to_string(edge.destination);
-            std::string edgeKey2 = std::to_string(edge.destination) + "_" + std::to_string(edge.source);
-            edgeMap[edgeKey1] = i;
-            edgeMap[edgeKey2] = i; // Bidirectional
+            adjacencyList[destination].push_back({source, edge});
+
         }
         
         file.close();
@@ -139,7 +163,7 @@ bool MapGraph::loadQueriesFromFile(const std::string& filename) {
         // Read query information
         for (int i = 0; i < numQueries; i++) {
             Query q;
-            file >> q.startX >> q.startY >> q.endX >> q.endY >> q.maxSpeed;
+            file >> q.startX >> q.startY >> q.endX >> q.endY >> q.R;
             
             // Check for invalid query data
             if (file.fail()) {
@@ -148,9 +172,9 @@ bool MapGraph::loadQueriesFromFile(const std::string& filename) {
             }
             
             // Validate max speed
-            if (q.maxSpeed < 0) {
-                std::cerr << "Invalid max speed in query " << i << ": " << q.maxSpeed << std::endl;
-                q.maxSpeed = 0; // Use default instead
+            if (q.R < 0) {
+                std::cerr << "Invalid max walking distance in query " << i << ": " << q.R << std::endl;
+                q.R = 0; // Use default instead
             }
             
             queries.push_back(q);
@@ -166,93 +190,111 @@ bool MapGraph::loadQueriesFromFile(const std::string& filename) {
     }
 }
 
-std::string MapGraph::findShortestPath(double startX, double startY, double endX, double endY, double maxSpeed) {
+PathResult MapGraph::findShortestPath(double startX, double startY, double endX, double endY, double R) {
     // Find closest nodes to start and end coordinates
-    int startNode = findClosestNode(startX, startY);
-    int endNode = findClosestNode(endX, endY);
+    std::pair<int,double> closestToStart = findClosestNode(startX, startY);
+    std::pair<int,double> closestToEnd = findClosestNode(endX, endY);
+    int startNode = closestToStart.first;
+    int endNode = closestToEnd.first;
+
+    std::cerr << "Start Node: " << startNode << std::endl << "End Node: " << endNode << std::endl;
+
+    double startWalking = closestToStart.second;
+    double endWalking = closestToEnd.second;
+
+    PathResult result;
     
     std::cerr << "Finding shortest path from node " << startNode << " to node " << endNode << std::endl;
     
     if (startNode == -1 || endNode == -1) {
         std::cerr << "Error: Could not find valid start or end node" << std::endl;
-        lastPath.clear();
-        lastTravelTime = 0.0;
-        lastDistance = 0.0;
-        lastDirectDistance = calculateDistance(startX, startY, endX, endY);
-        return "Error: Could not find valid start or end node";
+        result.path.clear();
+        result.travelTime = 0.0;
+        result.walkingDistance = 0.0;
+        result.vehicleDistance = 0.0;
+        result.resultText = "Error: Could not find valid start or end node";
+        return result;
     }
     
     // Print coordinates and found nodes for debugging
     std::cerr << "Query: (" << startX << "," << startY << ") to (" << endX << "," << endY 
-              << "), maxSpeed=" << maxSpeed 
+              << "), R =" << R
               << " -> nodes: " << startNode << " to " << endNode << std::endl;
     
     // If start and end are the same, return a simple path
     if (startNode == endNode) {
-        lastPath = {startNode};
-        lastTravelTime = 0.0;
-        lastDistance = 0.0;
-        lastDirectDistance = calculateDistance(startX, startY, endX, endY);
+        result.path = {startNode};
+        result.travelTime = 0.0;
+        result.walkingDistance = 0.0;
+        result.vehicleDistance = 0.0;
         
         std::stringstream ss;
         ss << startNode << std::endl;
-        ss << std::fixed << std::setprecision(2) << lastTravelTime << " mins" << std::endl;
-        ss << std::fixed << std::setprecision(2) << lastDistance << " km" << std::endl;
-        ss << std::fixed << std::setprecision(2) << lastDirectDistance << " km" << std::endl;
+        ss << std::fixed << std::setprecision(2) << result.travelTime << " mins" << std::endl;
+        ss << std::fixed << std::setprecision(2) << result.vehicleDistance + result.walkingDistance << " km" << std::endl;
+        ss << std::fixed << std::setprecision(2) << result.walkingDistance << " km" << std::endl;
+        ss << std::fixed << std::setprecision(2) << result.vehicleDistance << " km" << std::endl;
         
-        return ss.str();
+        result.resultText = ss.str();
+        return result;
     }
     
     // Check if nodes are valid indices
-    if (startNode >= static_cast<int>(nodes.size()) || endNode >= static_cast<int>(nodes.size()) ||
-        startNode < 0 || endNode < 0) {
+    if (startNode >= static_cast<int>(nodePositions.size()) || endNode >= static_cast<int>(nodePositions.size()) ||
+        startNode < 0 || endNode < 0 || startWalking > R || endWalking > R) {
         std::cerr << "Error: Invalid node indices: " << startNode << ", " << endNode << std::endl;
-        lastPath.clear();
-        lastTravelTime = 0.0;
-        lastDistance = 0.0;
-        lastDirectDistance = calculateDistance(startX, startY, endX, endY);
-        return "Error: Invalid node indices";
+        result.path.clear();
+        result.travelTime = 0.0;
+        result.vehicleDistance = 0.0;
+        result.walkingDistance = 0.0;
+        result.resultText = "Error: Invalid node indices";
+        return result;
     }
     
     // Make sure adjacency list is properly sized
     if (adjacencyList.size() <= static_cast<size_t>(std::max(startNode, endNode))) {
         std::cerr << "Error: Adjacency list not properly sized for nodes" << std::endl;
         std::cerr << "Adjacency list size: " << adjacencyList.size() << ", needed: " << std::max(startNode, endNode) + 1 << std::endl;
-        lastPath.clear();
-        lastTravelTime = 0.0;
-        lastDistance = 0.0;
-        lastDirectDistance = calculateDistance(startX, startY, endX, endY);
-        return "Error: Adjacency list not properly sized";
+        result.path.clear();
+        result.travelTime = 0.0;
+        result.vehicleDistance = 0.0;
+        result.walkingDistance = 0.0;
+        result.resultText = "Error: Adjacency list not properly sized";
+        return result;
     }
     
     // Check if the nodes have any neighbors
     if (adjacencyList[startNode].empty()) {
         std::cerr << "Error: Start node " << startNode << " has no neighbors" << std::endl;
-        lastPath.clear();
-        lastTravelTime = 0.0;
-        lastDistance = 0.0;
-        lastDirectDistance = calculateDistance(startX, startY, endX, endY);
-        return "Error: Start node has no neighbors";
+        result.path.clear();
+        result.travelTime = 0.0;
+        result.vehicleDistance = 0.0;
+        result.walkingDistance = 0.0;
+        result.resultText = "Error: Start node has no neighbors";
+        return result;
     }
     
     if (adjacencyList[endNode].empty()) {
         std::cerr << "Error: End node " << endNode << " has no neighbors" << std::endl;
-        lastPath.clear();
-        lastTravelTime = 0.0;
-        lastDistance = 0.0;
-        lastDirectDistance = calculateDistance(startX, startY, endX, endY);
-        return "Error: End node has no neighbors";
+        result.path.clear();
+        result.travelTime = 0.0;
+        result.vehicleDistance = 0.0;
+        result.walkingDistance = 0.0;
+        result.resultText = "Error: End node has no neighbors";
+        return result;
     }
-    
+
     // Initialize arrays for Dijkstra's algorithm
-    std::vector<double> dist(nodes.size(), std::numeric_limits<double>::infinity());
-    std::vector<int> prev(nodes.size(), -1);
-    std::vector<bool> visited(nodes.size(), false);
+    std::vector<double> time(nodePositions.size(), std::numeric_limits<double>::infinity());
+    std::vector<double> dist(nodePositions.size());
+    std::vector<int> prev(nodePositions.size(), -1);
+    std::vector<bool> visited(nodePositions.size(), false);
     
     // Priority queue for Dijkstra's algorithm - (distance, node)
     std::priority_queue<std::pair<double, int>, std::vector<std::pair<double, int>>, std::greater<std::pair<double, int>>> pq;
     
-    // Start node has distance 0
+    // Start node has time 0
+    time[startNode] = 0.0;
     dist[startNode] = 0.0;
     pq.push({0.0, startNode});
     
@@ -262,8 +304,7 @@ std::string MapGraph::findShortestPath(double startX, double startY, double endX
     
     // Dijkstra's algorithm
     while (!pq.empty()) {
-        double currDist = pq.top().first;
-        int currNode = pq.top().second;
+        auto [currTime, currNode] = pq.top();
         pq.pop();
         
         nodesExplored++;
@@ -290,45 +331,41 @@ std::string MapGraph::findShortestPath(double startX, double startY, double endX
         }
         
         // Check all neighbors
-        for (const auto& neighbor : adjacencyList[currNode]) {
-            int nextNode = neighbor.first;
-            double travelTime = neighbor.second;
-            
+        for (const auto& [neighbor, edge] : adjacencyList[currNode]) {
             // Skip already visited nodes
-            if (visited[nextNode]) {
-                continue;
+            if (visited[neighbor]) continue;
+
+            double distance = edge.distance;
+            double speed;
+            if (speedCount == 1) speed = edge.speeds[0];
+            else {
+                speed = edge.speeds[static_cast<int>(time[currNode]/speedInterval) % speedCount];
             }
-            
-            // Apply speed constraint if specified
-            if (maxSpeed > 0) {
-                std::string edgeKey = std::to_string(currNode) + "_" + std::to_string(nextNode);
-                auto it = edgeMap.find(edgeKey);
-                
-                if (it != edgeMap.end()) {
-                    const Edge& edge = edges[it->second];
-                    double adjustedSpeed = std::min(edge.speed, maxSpeed);
-                    travelTime = (edge.distance / adjustedSpeed) * 60.0; // minutes
-                }
-            }
-            
+            double travelTime = (distance/speed)*60;
+
             // Relaxation step
-            double newDist = dist[currNode] + travelTime;
-            if (newDist < dist[nextNode]) {
-                dist[nextNode] = newDist;
-                prev[nextNode] = currNode;
-                pq.push({newDist, nextNode});
+            double newTime = time[currNode] + travelTime;
+            double newDist = dist[currNode] + distance;
+            if (newTime < time[neighbor]) {
+                time[neighbor] = newTime;
+                dist[neighbor] = newDist;
+                prev[neighbor] = currNode;
+                double heuristic = (calculateDistance(nodePositions[neighbor].first, nodePositions[neighbor].second,
+                                                      nodePositions[endNode].first, nodePositions[endNode].second)/max_speed)*60;
+                pq.push({newTime + heuristic, neighbor});
             }
         }
     }
     
     // If end node was not reached
-    if (!endNodeReached || dist[endNode] == std::numeric_limits<double>::infinity()) {
+    if (!endNodeReached || time[endNode] == std::numeric_limits<double>::infinity()) {
         std::cerr << "Error: No path found from node " << startNode << " to " << endNode << std::endl;
-        lastPath.clear();
-        lastTravelTime = 0.0;
-        lastDistance = 0.0;
-        lastDirectDistance = calculateDistance(startX, startY, endX, endY);
-        return "No path found";
+        result.path.clear();
+        result.travelTime = 0.0;
+        result.vehicleDistance = 0.0;
+        result.walkingDistance = 0.0;
+        result.resultText = "No path found";
+        return result;
     }
     
     // Reconstruct path
@@ -337,7 +374,7 @@ std::string MapGraph::findShortestPath(double startX, double startY, double endX
         path.push_back(at);
         
         // Safety check to avoid infinite loops
-        if (path.size() > nodes.size()) {
+        if (path.size() > nodePositions.size()) {
             std::cerr << "Warning: Path reconstruction loop detected" << std::endl;
             break;
         }
@@ -355,85 +392,92 @@ std::string MapGraph::findShortestPath(double startX, double startY, double endX
         }
         
         // Try direct path as fallback
-        lastPath = {startNode, endNode};
+        result.path = {startNode, endNode};
     } else {
         lastPath = path;
+        result.path = path;
     }
     
     // Calculate travel time (already computed during Dijkstra)
-    lastTravelTime = dist[endNode];
+    result.travelTime = time[endNode];
+
+    // Calculate walking distance
+    result.walkingDistance = startWalking + endWalking;
     
-    // Calculate total path distance
-    lastDistance = 0.0;
-    for (size_t i = 0; i < lastPath.size() - 1; i++) {
-        int u = lastPath[i];
-        int v = lastPath[i + 1];
-        
-        std::string edgeKey = std::to_string(u) + "_" + std::to_string(v);
-        
-        // Check if edge exists in our map
-        auto it = edgeMap.find(edgeKey);
-        if (it != edgeMap.end()) {
-            // Direct lookup into edges array using the index from the map
-            lastDistance += edges[it->second].distance;
-        } else {
-            // Fallback to linear search if not found in map (should not happen)
-            bool found = false;
-            for (const auto& edge : edges) {
-                if ((edge.source == u && edge.destination == v) ||
-                    (edge.source == v && edge.destination == u)) {
-                    lastDistance += edge.distance;
-                    found = true;
-                    break;
-                }
-            }
-            
-            if (!found) {
-                // If edge not found at all, use direct distance
-                if (nodePositions.find(u) != nodePositions.end() && 
-                    nodePositions.find(v) != nodePositions.end()) {
-                    double directDist = calculateDistance(
-                        nodePositions[u].first, nodePositions[u].second,
-                        nodePositions[v].first, nodePositions[v].second);
-                    lastDistance += directDist;
-                    std::cerr << "Warning: Using direct distance for edge " << u << "->" << v << ": " << directDist << " km" << std::endl;
-                } else {
-                    std::cerr << "Error: Edge not found between nodes " << u << " and " << v << std::endl;
-                }
-            }
-        }
-    }
+    // Calculate vehicle path distance (already computed during Dijkstra)
+    result.vehicleDistance = dist[endNode];
+
+    // for (size_t i = 0; i < lastPath.size() - 1; i++) {
+    //     int u = lastPath[i];
+    //     int v = lastPath[i + 1];
+
+    //     std::string edgeKey = std::to_string(u) + "_" + std::to_string(v);
+
+    //     // Check if edge exists in our map
+    //     auto it = edgeMap.find(edgeKey);
+    //     if (it != edgeMap.end()) {
+    //         // Direct lookup into edges array using the index from the map
+    //         lastDistance += edges[it->second].distance;
+    //     } else {
+    //         // Fallback to linear search if not found in map (should not happen)
+    //         bool found = false;
+    //         for (const auto& edge : edges) {
+    //             if ((edge.source == u && edge.destination == v) ||
+    //                 (edge.source == v && edge.destination == u)) {
+    //                 lastDistance += edge.distance;
+    //                 found = true;
+    //                 break;
+    //             }
+    //         }
+
+    //         if (!found) {
+    //             // If edge not found at all, use direct distance
+    //             if (nodePositions.find(u) != nodePositions.end() &&
+    //                 nodePositions.find(v) != nodePositions.end()) {
+    //                 double directDist = calculateDistance(
+    //                     nodePositions[u].first, nodePositions[u].second,
+    //                     nodePositions[v].first, nodePositions[v].second);
+    //                 lastDistance += directDist;
+    //                 std::cerr << "Warning: Using direct distance for edge " << u << "->" << v << ": " << directDist << " km" << std::endl;
+    //             } else {
+    //                 std::cerr << "Error: Edge not found between nodes " << u << " and " << v << std::endl;
+    //             }
+    //         }
+    //     }
+    // }
     
-    // Calculate direct distance (Euclidean) between start and end
-    lastDirectDistance = calculateDistance(startX, startY, endX, endY);
     
-    // Debug output
-    std::cerr << "Path found with " << lastPath.size() << " nodes:" << std::endl;
-    for (size_t i = 0; i < lastPath.size(); i++) {
-        std::cerr << lastPath[i];
-        if (i < lastPath.size() - 1) {
+    //Debug output
+    std::cerr << "Path found with " << result.path.size() << " nodes:" << std::endl;
+    for (size_t i = 0; i < result.path.size(); i++) {
+        std::cerr << result.path[i];
+        if (i < result.path.size() - 1) {
             std::cerr << " -> ";
         }
     }
     std::cerr << std::endl;
-    std::cerr << "Travel time: " << lastTravelTime << " mins" << std::endl;
-    std::cerr << "Distance: " << lastDistance << " km" << std::endl;
-    std::cerr << "Direct distance: " << lastDirectDistance << " km" << std::endl;
+    std::cerr << "Travel time: " << result.travelTime << " mins" << std::endl;
+    std::cerr << "Total Distance: " << result.vehicleDistance + result.walkingDistance << " km" << std::endl;
+    std::cerr << "Walking distance: " << result.walkingDistance << " km" << std::endl;
+    std::cerr << "Vehicle Distance: " << result.vehicleDistance << " km" << std::endl;
     
     // Format result string
     std::stringstream ss;
-    for (size_t i = 0; i < lastPath.size(); i++) {
-        ss << lastPath[i];
-        if (i < lastPath.size() - 1) {
+    for (size_t i = 0; i < result.path.size(); i++) {
+        ss << result.path[i];
+        if (i < result.path.size() - 1) {
             ss << " ";
         }
     }
     ss << std::endl;
-    ss << std::fixed << std::setprecision(2) << lastTravelTime << " mins" << std::endl;
-    ss << std::fixed << std::setprecision(2) << lastDistance << " km" << std::endl;
-    ss << std::fixed << std::setprecision(2) << lastDirectDistance << " km" << std::endl;
+    ss << std::fixed << std::setprecision(2) << result.travelTime << " mins" << std::endl;
+    ss << std::fixed << std::setprecision(2) << result.vehicleDistance + result.walkingDistance << " km" << std::endl;
+    ss << std::fixed << std::setprecision(2) << result.walkingDistance << " km" << std::endl;
+    ss << std::fixed << std::setprecision(2) << result.vehicleDistance << " km" << std::endl;
     
-    return ss.str();
+    result.resultText = ss.str();
+
+    return result;
 }
 
 std::string MapGraph::compareWithOutput(const std::string& outputFilename) {
@@ -451,7 +495,8 @@ std::string MapGraph::compareWithOutput(const std::string& outputFilename) {
     int totalPathMatches = 0;
     double totalTimeError = 0.0;
     double totalDistanceError = 0.0;
-    double totalDirectDistanceError = 0.0;
+    double totalWalkingDistanceError = 0.0;
+    double totalVehicleDistanceError = 0.0;
     double totalExecTime = 0.0;
     
     // Make sure we have queries loaded
@@ -462,9 +507,10 @@ std::string MapGraph::compareWithOutput(const std::string& outputFilename) {
     while (hasMoreQueries && queryNumber < static_cast<int>(queries.size())) {
         std::vector<int> expectedPath;
         double expectedTime = 0.0;
-        double expectedDistance = 0.0;
-        double expectedDirectDistance = 0.0;
-        
+        double expectedTotalDistance = 0.0;
+        double expectedWalkingDistance = 0.0;
+        double expectedVehicleDistance = 0.0;
+
         // Read the expected path
         if (std::getline(file, line)) {
             // Check if this is a blank line separating query results
@@ -494,24 +540,36 @@ std::string MapGraph::compareWithOutput(const std::string& outputFilename) {
             break;
         }
         
-        // Read expected distance
+        // Read expected total distance
         if (std::getline(file, line)) {
             // Extract number from "X.XX km" format
             size_t pos = line.find(" km");
             if (pos != std::string::npos) {
-                expectedDistance = std::stod(line.substr(0, pos));
+                expectedTotalDistance = std::stod(line.substr(0, pos));
             }
         } else {
             hasMoreQueries = false;
             break;
         }
         
-        // Read expected direct distance
+        // Read expected walking distance
         if (std::getline(file, line)) {
             // Extract number from "X.XX km" format
             size_t pos = line.find(" km");
             if (pos != std::string::npos) {
-                expectedDirectDistance = std::stod(line.substr(0, pos));
+                expectedWalkingDistance = std::stod(line.substr(0, pos));
+            }
+        } else {
+            hasMoreQueries = false;
+            break;
+        }
+
+        // Read expected vehicle distance
+        if (std::getline(file, line)) {
+            // Extract number from "X.XX km" format
+            size_t pos = line.find(" km");
+            if (pos != std::string::npos) {
+                expectedVehicleDistance = std::stod(line.substr(0, pos));
             }
         } else {
             hasMoreQueries = false;
@@ -527,20 +585,18 @@ std::string MapGraph::compareWithOutput(const std::string& outputFilename) {
         
         // Compute the actual path for this specific query
         auto startTime = std::chrono::high_resolution_clock::now();
-        findShortestPath(currentQuery.startX, currentQuery.startY, 
-                        currentQuery.endX, currentQuery.endY, 
-                        currentQuery.maxSpeed);
+        PathResult pathResult = findShortestPath(currentQuery.startX, currentQuery.startY,
+                                                 currentQuery.endX, currentQuery.endY,
+                                                 currentQuery.R);
         auto endTime = std::chrono::high_resolution_clock::now();
         double execTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count() / 1000.0;
         totalExecTime += execTime;
-        
-        // Now lastPath, lastTravelTime, etc. are updated with results for this query
         
         // Compare results
         result << "Query #" << queryNumber << ":\n";
         
         // Compare paths
-        bool pathMatch = (expectedPath == lastPath);
+        bool pathMatch = (expectedPath == pathResult.path);
         if (pathMatch) {
             totalPathMatches++;
         }
@@ -554,36 +610,45 @@ std::string MapGraph::compareWithOutput(const std::string& outputFilename) {
             result << std::endl;
             
             result << "  Actual path: ";
-            for (const auto& node : lastPath) {
+            for (const auto& node : pathResult.path) {
                 result << node << " ";
             }
             result << std::endl;
         }
         
         // Compare times
-        double timeError = std::abs(expectedTime - lastTravelTime);
+        double timeError = std::abs(expectedTime - pathResult.travelTime);
         totalTimeError += timeError;
         result << "  Time error: " << std::fixed << std::setprecision(2) << timeError << " mins";
         if (timeError > 0.01) {
-            result << " (Expected: " << expectedTime << ", Actual: " << lastTravelTime << ")";
+            result << " (Expected: " << expectedTime << ", Actual: " << pathResult.travelTime << ")";
         }
         result << std::endl;
         
         // Compare distances
-        double distanceError = std::abs(expectedDistance - lastDistance);
+        double distanceError = std::abs(expectedTotalDistance - (pathResult.walkingDistance + pathResult.vehicleDistance));
         totalDistanceError += distanceError;
         result << "  Distance error: " << std::fixed << std::setprecision(2) << distanceError << " km";
         if (distanceError > 0.01) {
-            result << " (Expected: " << expectedDistance << ", Actual: " << lastDistance << ")";
+            result << " (Expected: " << expectedTotalDistance << ", Actual: " << (pathResult.walkingDistance + pathResult.vehicleDistance) << ")";
         }
         result << std::endl;
         
-        // Compare direct distances
-        double directDistanceError = std::abs(expectedDirectDistance - lastDirectDistance);
-        totalDirectDistanceError += directDistanceError;
-        result << "  Direct distance error: " << std::fixed << std::setprecision(2) << directDistanceError << " km";
-        if (directDistanceError > 0.01) {
-            result << " (Expected: " << expectedDirectDistance << ", Actual: " << lastDirectDistance << ")";
+        // Compare walking distances
+        double walkingDistanceError = std::abs(expectedWalkingDistance - pathResult.walkingDistance);
+        totalWalkingDistanceError += walkingDistanceError;
+        result << "  Direct distance error: " << std::fixed << std::setprecision(2) << walkingDistanceError << " km";
+        if (walkingDistanceError > 0.01) {
+            result << " (Expected: " << expectedWalkingDistance << ", Actual: " << pathResult.walkingDistance << ")";
+        }
+        result << std::endl;
+
+        // Compare vehicle distances
+        double vehicleDistanceError = std::abs(expectedVehicleDistance - pathResult.vehicleDistance);
+        totalVehicleDistanceError += vehicleDistanceError;
+        result << "  Direct distance error: " << std::fixed << std::setprecision(2) << vehicleDistanceError << " km";
+        if (vehicleDistanceError > 0.01) {
+            result << " (Expected: " << expectedVehicleDistance << ", Actual: " << pathResult.vehicleDistance << ")";
         }
         result << std::endl;
         
@@ -604,38 +669,40 @@ std::string MapGraph::compareWithOutput(const std::string& outputFilename) {
     double pathMatchAccuracy = (queryNumber > 0) ? (static_cast<double>(totalPathMatches) / queryNumber) * 100.0 : 0.0;
     double avgTimeError = (queryNumber > 0) ? totalTimeError / queryNumber : 0.0;
     double avgDistanceError = (queryNumber > 0) ? totalDistanceError / queryNumber : 0.0;
-    double avgDirectDistanceError = (queryNumber > 0) ? totalDirectDistanceError / queryNumber : 0.0;
+    double avgWalkingDistanceError = (queryNumber > 0) ? totalWalkingDistanceError / queryNumber : 0.0;
+    double avgVehicleDistanceError = (queryNumber > 0) ? totalVehicleDistanceError / queryNumber : 0.0;
     
     result << "\n===== SUMMARY STATISTICS =====\n";
     result << "Total queries processed: " << queryNumber << std::endl;
     result << "Path match accuracy: " << std::fixed << std::setprecision(2) << pathMatchAccuracy 
            << "% (" << totalPathMatches << "/" << queryNumber << " correct)" << std::endl;
     result << "Average time error: " << std::fixed << std::setprecision(2) << avgTimeError << " mins" << std::endl;
-    result << "Average distance error: " << std::fixed << std::setprecision(2) << avgDistanceError << " km" << std::endl;
-    result << "Average direct distance error: " << std::fixed << std::setprecision(2) << avgDirectDistanceError << " km" << std::endl;
+    result << "Average total distance error: " << std::fixed << std::setprecision(2) << avgDistanceError << " km" << std::endl;
+    result << "Average walking distance error: " << std::fixed << std::setprecision(2) << avgWalkingDistanceError << " km" << std::endl;
+    result << "Average vehicle distance error: " << std::fixed << std::setprecision(2) << avgVehicleDistanceError << " km" << std::endl;
     result << "Total execution time: " << std::fixed << std::setprecision(3) << totalExecTime << " seconds" << std::endl;
     
     return result.str();
 }
 
-int MapGraph::findClosestNode(double x, double y) const {
-    if (nodes.empty()) {
-        return -1;
+std::pair<int,double> MapGraph::findClosestNode(double x, double y) const {
+    if (nodePositions.empty()) {
+        return {-1,std::numeric_limits<double>::infinity()};
     }
     
     int closestNode = -1;
     double minDistance = std::numeric_limits<double>::infinity();
     
     // Use direct access to node positions from the spatial index
-    for (const auto& [nodeId, position] : nodePositions) {
-        double distance = calculateDistance(x, y, position.first, position.second);
+    for (unsigned long long nodeId = 0; nodeId < nodePositions.size(); nodeId++) {
+        double distance = calculateDistance(x, y, nodePositions[nodeId].first, nodePositions[nodeId].second);
         if (distance < minDistance) {
             minDistance = distance;
             closestNode = nodeId;
         }
     }
     
-    return closestNode;
+    return {closestNode, minDistance};
 }
 
 double MapGraph::calculateDistance(double x1, double y1, double x2, double y2) const {
@@ -661,16 +728,16 @@ std::vector<PathResult> MapGraph::runAllQueries() {
                 std::cerr << "\n\n=== Processing Query #" << (i+1) << " ===" << std::endl;
                 std::cerr << "Coordinates: (" << query.startX << ", " << query.startY 
                           << ") to (" << query.endX << ", " << query.endY 
-                          << "), maxSpeed: " << query.maxSpeed << std::endl;
+                          << "), maxSpeed: " << query.R << std::endl;
                 
                 // Compute the actual path by finding the shortest path
-                result.resultText = findShortestPath(query.startX, query.startY, query.endX, query.endY, query.maxSpeed);
+                result = findShortestPath(query.startX, query.startY, query.endX, query.endY, query.R);
                 
                 // After findShortestPath has run, the lastPath, lastTravelTime etc. will be populated
-                result.path = lastPath;
-                result.travelTime = lastTravelTime;
-                result.distance = lastDistance;
-                result.directDistance = lastDirectDistance;
+                // result.path = lastPath;
+                // result.travelTime = lastTravelTime;
+                // result.distance = lastDistance;
+                // result.directDistance = lastDirectDistance;
                 
                 // Debug output
                 std::cerr << "Query #" << (i+1) << " result: " << std::endl;
@@ -680,8 +747,8 @@ std::vector<PathResult> MapGraph::runAllQueries() {
                 }
                 std::cerr << std::endl;
                 std::cerr << "  Travel time: " << result.travelTime << " mins" << std::endl;
-                std::cerr << "  Distance: " << result.distance << " km" << std::endl;
-                std::cerr << "  Direct distance: " << result.directDistance << " km" << std::endl;
+                std::cerr << "  Vehicle Distance: " << result.vehicleDistance << " km" << std::endl;
+                std::cerr << "  Walking distance: " << result.walkingDistance << " km" << std::endl;
                 
             } catch (const std::exception& e) {
                 std::cerr << "Exception processing query " << i << ": " << e.what() << std::endl;
