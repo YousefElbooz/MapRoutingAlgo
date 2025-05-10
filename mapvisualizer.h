@@ -37,6 +37,15 @@ signals:
 protected:
     void paintEvent(QPaintEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
+    //Mouse Wheel Zooming In/Out////////////////////////////////////////////////////
+    void wheelEvent(QWheelEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+private:
+    double scaleFactor = 1.0;  // Zoom level, default = 100%
+    QPoint lastMousePos;
+    QPointF offset;        // Offset for panning
+    bool isPanning = false;
 
 private:
     std::shared_ptr<MapGraph> mapGraph;

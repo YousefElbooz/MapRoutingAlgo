@@ -6,6 +6,9 @@
 #include <chrono>
 #include <fstream>
 
+
+bool MainWindow::isSelectionEnabled = false;
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -32,7 +35,7 @@ void MainWindow::setupUi()
     // Create map visualizer widget
     mapVisualizer = new MapVisualizer(this);
     mapVisualizer->setMapGraph(mapGraph);
-    
+
     // Create controls panel
     QWidget *controlPanel = new QWidget(this);
     QVBoxLayout *controlLayout = new QVBoxLayout(controlPanel);
@@ -78,6 +81,18 @@ void MainWindow::setupUi()
     
     controlLayout->addWidget(fileGroup);
     
+    // Adding select start/end button/////////////////////////////////////////////////////////////////
+    QPushButton *enable_SE_Button = new QPushButton("Enable Start/End Selection", fileGroup);
+    enable_SE_Button->setCheckable(true);  // make it toggle
+    enable_SE_Button->setChecked(true);   // default: off
+    fileLayout->addWidget(enable_SE_Button);
+    connect(enable_SE_Button, &QPushButton::toggled, this, [=](bool checked) {
+        isSelectionEnabled = checked;
+        enableSelection();
+        enable_SE_Button->setStyleSheet("background-color: green; color: white;");
+    });
+
+
     // Path finding group
     QGroupBox *pathGroup = new QGroupBox("Path Finding", controlPanel);
     QVBoxLayout *pathLayout = new QVBoxLayout(pathGroup);
@@ -114,6 +129,7 @@ void MainWindow::setupUi()
     controlLayout->addWidget(outputGroup);
     
     // Add to splitter
+    // Wrap mapVisualizer in a scroll area
     mainSplitter->addWidget(mapVisualizer);
     mainSplitter->addWidget(controlPanel);
     mainSplitter->setStretchFactor(0, 3);
@@ -294,4 +310,11 @@ void MainWindow::displayResult(const QString &result)
     outputTextEdit->setText(result);
     // Scroll to the top
     outputTextEdit->verticalScrollBar()->setValue(outputTextEdit->verticalScrollBar()->minimum());
+}
+
+
+void MainWindow::enableSelection()
+{
+    isSelectionEnabled = !isSelectionEnabled;
+    qDebug() << "Selection mode is now " << (isSelectionEnabled ? "ON" : "OFF");
 }

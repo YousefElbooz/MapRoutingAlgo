@@ -1,13 +1,14 @@
 #include "mapvisualizer.h"
+#include "mainwindow.h"
 #include <QDebug>
 
 MapVisualizer::MapVisualizer(QWidget *parent)
     : QWidget(parent),
       isStartPointSelected(false),
-      nodeDiameter(0.25),
-      pathThickness(100),
+      nodeDiameter(0),
+      pathThickness(2),
       nodeColor(Qt::blue),
-      edgeColor(Qt::gray),
+      edgeColor(Qt::green),
       pathColor(Qt::red),
       selectedNodeColor(Qt::green),
       startPointColor(Qt::green),
@@ -49,9 +50,13 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
     
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
-    
-    // Fill background
-    painter.fillRect(rect(), Qt::white);
+
+    // Apply zoom (this is the new part)
+    painter.translate(offset);
+    painter.save();  // Save the original painter state
+    painter.scale(scaleFactor, scaleFactor);  // Zoom based on user input
+
+    painter.fillRect(rect(), Qt::black);
     
     if (!mapGraph) {
         painter.drawText(rect(), Qt::AlignCenter, "No map loaded");
@@ -112,7 +117,7 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
     // Draw selected points
     if (startPoint.x() != 0 || startPoint.y() != 0) {
         painter.setBrush(startPointColor);
-        painter.setPen(Qt::black);
+        painter.setPen(Qt::white);
         QPointF transformedStart = transformCoordinates(startPoint.x(), startPoint.y());
         painter.drawEllipse(transformedStart, nodeDiameter / 2, nodeDiameter / 2);
         painter.drawText(transformedStart.x() - 4, transformedStart.y() - 10, "S");
@@ -120,15 +125,17 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
     
     if (endPoint.x() != 0 || endPoint.y() != 0) {
         painter.setBrush(endPointColor);
-        painter.setPen(Qt::black);
+        painter.setPen(Qt::white);
         QPointF transformedEnd = transformCoordinates(endPoint.x(), endPoint.y());
         painter.drawEllipse(transformedEnd, nodeDiameter / 2, nodeDiameter / 2);
         painter.drawText(transformedEnd.x() - 4, transformedEnd.y() - 10, "E");
     }
+
+    painter.restore();  // Restore painter to original state (good practice)
 }
 
 void MapVisualizer::mouseReleaseEvent(QMouseEvent *event) {
-    if (!mapGraph) {
+    if (!mapGraph || !MainWindow::isSelectionEnabled) {
         return;
     }
     
@@ -145,6 +152,11 @@ void MapVisualizer::mouseReleaseEvent(QMouseEvent *event) {
         emit pointsSelected(startPoint.x(), startPoint.y(), endPoint.x(), endPoint.y());
     }
     
+    if (event->button() == Qt::LeftButton) {
+        isPanning = false;
+        setCursor(Qt::ArrowCursor);
+    }
+
     update();
 }
 
@@ -236,4 +248,49 @@ void MapVisualizer::calculateGraphBounds() {
         maxX - minX + 2 * paddingX,
         maxY - minY + 2 * paddingY
     );
-} 
+}
+
+//Mouse Wheel Zooming function
+void MapVisualizer::wheelEvent(QWheelEvent *event)
+{
+    double factor = (event->angleDelta().y() > 0) ? 1.1 : 0.9;
+
+    // Optional: zoom centered around the cursor
+    QPointF cursorPos = event->position(); // Qt 5.14+
+    QPointF beforeScale = (cursorPos - offset) / scaleFactor;
+
+    scaleFactor *= factor;
+
+    QPointF afterScale = beforeScale * scaleFactor;
+    offset += (cursorPos - offset) - afterScale;
+
+    double newScale = scaleFactor * factor;
+    if (newScale >= 1.0) {  // 1.0 = default size
+        scaleFactor = newScale;
+        update(); // or repaint/draw logic
+    }
+
+
+    update();
+}
+
+void MapVisualizer::mousePressEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton) {
+            isPanning = true;
+            lastMousePos = event->pos();
+            setCursor(Qt::ClosedHandCursor);
+    }
+    else
+       isPanning=false;
+}
+
+void MapVisualizer::mouseMoveEvent(QMouseEvent *event)
+{
+    if (isPanning) {
+        QPoint delta = event->pos() - lastMousePos;
+        offset += delta;
+        lastMousePos = event->pos();
+        update();
+    }
+}

@@ -36,6 +36,10 @@ private slots:
     void findShortestPath();
     void onPointsSelected(double startX, double startY, double endX, double endY);
     void runAllQueries();
+    void enableSelection();
+
+public:
+    static bool isSelectionEnabled;
 
 private:
     Ui::MainWindow *ui;
