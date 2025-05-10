@@ -57,57 +57,34 @@ bool MapGraph::loadMapFromFile(const std::string& filename) {
         
         // Read number of edges
         int numEdges;
-        speedCount = 1;
-        speedInterval = 0.0;
-        std::string line;
-        std::getline(file >> std::ws, line); // read the next non-empty line
+        file >> numEdges;
 
-        std::istringstream edge(line);
-
-        edge >> numEdges;
-
-        if (edge >> speedCount >> speedInterval) {
-            // Bonus case
-            std::cerr << "Bonus case: numEdges = " << numEdges
-                      << ", speedCount = " << speedCount
-                      << ", speedInterval = " << speedInterval << std::endl;
-        } else {
-            // Normal case
-            std::cerr << "Normal case: numEdges = " << numEdges << std::endl;
+        if (numEdges <= 0 || numEdges > 10000000) { // Sanity check for edge count
+            std::cerr << "Invalid number of edges: " << numEdges << std::endl;
+            return false;
         }
 
-
-        // if (numEdges <= 0 || numEdges > 10000000) { // Sanity check for edge count
-        //     std::cerr << "Invalid number of edges: " << numEdges << std::endl;
-        //     return false;
-        // }
-        
         // Reserve capacity
         edges.reserve(numEdges);
 
         // Initialize adjacency list
         adjacencyList.resize(numNodes);
-        
+
         max_speed = 0;
         // Read edge information
         for (int i = 0; i < numEdges; i++) {
             int source, destination;
             Edge edge;
-            file >> source >> destination >> edge.distance;
+            file >> source >> destination >> edge.distance >> edge.speed;
 
-            edge.speeds.resize(speedCount);
+            max_speed = qMax(max_speed, edge.speed);
 
-            for (int i = 0; i < speedCount; ++i){
-                file >> edge.speeds[i];
-                max_speed = qMax(max_speed, edge.speeds[i]);
-            }
-            
             // Check for invalid edge data
             if (file.fail()) {
                 std::cerr << "Error reading edge data at index " << i << std::endl;
                 return false;
             }
-            
+
             // Validate edge data
             // if (edge.source < 0 || edge.source >= numNodes ||
             //     edge.destination < 0 || edge.destination >= numNodes ||
@@ -117,13 +94,13 @@ bool MapGraph::loadMapFromFile(const std::string& filename) {
             //               << distance << std::endl;
             //     continue; // Skip invalid edge
             // }
-            
+
             edges.push_back({source,destination});
 
             // Update adjacency list
-            adjacencyList[source].push_back({destination, edge});
+            adjacencyList[source].push_back({destination, {edge.distance, edge.speed}});
             // Assuming bidirectional edges
-            adjacencyList[destination].push_back({source, edge});
+            adjacencyList[destination].push_back({source, {edge.distance, edge.speed}});
 
         }
         
@@ -336,11 +313,7 @@ PathResult MapGraph::findShortestPath(double startX, double startY, double endX,
             if (visited[neighbor]) continue;
 
             double distance = edge.distance;
-            double speed;
-            if (speedCount == 1) speed = edge.speeds[0];
-            else {
-                speed = edge.speeds[static_cast<int>(time[currNode]/speedInterval) % speedCount];
-            }
+            double speed = edge.speed;
             double travelTime = (distance/speed)*60;
 
             // Relaxation step

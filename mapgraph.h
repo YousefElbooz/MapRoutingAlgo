@@ -13,7 +13,7 @@ struct Node {
 
 struct Edge {
     double distance;
-    std::vector<double> speeds;
+    double speed;
 };
 
 struct PathResult {
@@ -37,8 +37,6 @@ public:
     std::vector<PathResult> runAllQueries();
 
     // Getter and setter to help A* heuristics
-    int get_max_speed(){return max_speed;}
-    void set_max_speed(int speed){max_speed = speed;}
 
     // Get nodes and edges
     std::vector<std::pair<double, double>> getNodes(){return nodePositions;}
@@ -53,8 +51,6 @@ public:
 private:
     std::vector<std::vector<std::pair<int, Edge>>> adjacencyList; // node -> [(neighbor, travel_time)]
     double max_speed;
-    int speedCount;
-    double speedInterval;
 
     // For faster lookups
     std::vector<std::pair<int,int>> edges;
