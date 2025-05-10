@@ -34,6 +34,9 @@ public:
     bool loadQueriesFromFile(const std::string& filename);
     PathResult findShortestPath(double startX, double startY, double endX, double endY, double R);
     std::string compareWithOutput(const std::string& outputFilename);
+
+    std::vector<std::pair<int, double>> findNodesWithinRadius(double x, double y, double R);
+
     std::vector<PathResult> runAllQueries();
 
     // Getter and setter to help A* heuristics
