@@ -6,7 +6,6 @@
 #include <QPaintEvent>
 #include <QMouseEvent>
 #include <QPoint>
-#include <vector>
 #include <memory>
 #include "mapgraph.h"
 

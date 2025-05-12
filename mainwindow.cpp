@@ -2,7 +2,6 @@
 #include "ui_mainwindow.h"
 #include <QSplitter>
 #include <QScrollBar>
-#include <iostream>
 #include <chrono>
 #include <fstream>
 
@@ -82,13 +81,13 @@ void MainWindow::setupUi()
     QGroupBox *pathGroup = new QGroupBox("Path Finding", controlPanel);
     QVBoxLayout *pathLayout = new QVBoxLayout(pathGroup);
     
-    QHBoxLayout *maxSpeedLayout = new QHBoxLayout();
-    QLabel *maxSpeedLabel = new QLabel("Max Speed (km/h):", pathGroup);
-    maxSpeedEdit = new QLineEdit(pathGroup);
-    maxSpeedEdit->setText("100");
-    maxSpeedLayout->addWidget(maxSpeedLabel);
-    maxSpeedLayout->addWidget(maxSpeedEdit);
-    pathLayout->addLayout(maxSpeedLayout);
+    QHBoxLayout *RLayout = new QHBoxLayout();
+    QLabel *RLabel = new QLabel("Max Walking Distance (km):", pathGroup);
+    REdit = new QLineEdit(pathGroup);
+    REdit->setText("10000");
+    RLayout->addWidget(RLabel);
+    RLayout->addWidget(REdit);
+    pathLayout->addLayout(RLayout);
     
     QLabel *instructionLabel = new QLabel("Click on map to select start and end points", pathGroup);
     pathLayout->addWidget(instructionLabel);
@@ -174,7 +173,7 @@ void MainWindow::compareOutputFile()
 
 void MainWindow::findShortestPath()
 {
-    if (mapGraph->getNodes().empty()) {
+    if (mapGraph->empty()) {
         displayResult("Error: No map loaded.");
         return;
     }
@@ -190,15 +189,15 @@ void MainWindow::findShortestPath()
     double endX = mapVisualizer->getEndPoint().x();
     double endY = mapVisualizer->getEndPoint().y();
     
-    double maxSpeed = maxSpeedEdit->text().toDouble();
+    double R = REdit->text().toDouble();
     
     auto start = std::chrono::high_resolution_clock::now();
-    std::string pathResult = mapGraph->findShortestPath(startX, startY, endX, endY, maxSpeed);
+    PathResult pathResult = mapGraph->findShortestPath(startX, startY, endX, endY, R);
     auto end = std::chrono::high_resolution_clock::now();
     
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     
-    QString result = QString::fromStdString(pathResult);
+    QString result = QString::fromStdString(pathResult.resultText);
     result += "\nComputation time: " + QString::number(duration) + " ms";
     
     displayResult(result);
@@ -207,15 +206,15 @@ void MainWindow::findShortestPath()
 
 void MainWindow::onPointsSelected(double startX, double startY, double endX, double endY)
 {
-    double maxSpeed = maxSpeedEdit->text().toDouble();
+    double R = REdit->text().toDouble();
     
     auto start = std::chrono::high_resolution_clock::now();
-    std::string pathResult = mapGraph->findShortestPath(startX, startY, endX, endY, maxSpeed);
+    PathResult pathResult = mapGraph->findShortestPath(startX, startY, endX, endY, R);
     auto end = std::chrono::high_resolution_clock::now();
     
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     
-    QString result = QString::fromStdString(pathResult);
+    QString result = QString::fromStdString(pathResult.resultText);
     result += "\nComputation time: " + QString::number(duration) + " ms";
     
     displayResult(result);
@@ -224,7 +223,7 @@ void MainWindow::onPointsSelected(double startX, double startY, double endX, dou
 
 void MainWindow::runAllQueries()
 {
-    if (mapGraph->getNodes().empty()) {
+    if (mapGraph->empty()) {
         displayResult("Error: No map loaded.");
         return;
     }
@@ -238,9 +237,6 @@ void MainWindow::runAllQueries()
         displayResult("Error: No output file selected for comparison.");
         return;
     }
-    
-    // Get max speed from UI if needed for all queries
-    double maxSpeed = maxSpeedEdit->text().toDouble();
     
     // Start timer for all queries
     auto startAll = std::chrono::high_resolution_clock::now();
