@@ -8,8 +8,8 @@ MapVisualizer::MapVisualizer(QWidget *parent)
       nodeDiameter(0),
       pathThickness(2),
       nodeColor(Qt::blue),
-      edgeColor(Qt::green),
-      pathColor(Qt::red),
+      edgeColor(Qt::red),
+      pathColor(Qt::cyan),
       selectedNodeColor(Qt::green),
       startPointColor(Qt::green),
       endPointColor(Qt::red) {

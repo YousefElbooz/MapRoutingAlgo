@@ -11,6 +11,9 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QGroupBox>
+
+#include <QCompleter>
+
 #include <memory>
 #include "mapgraph.h"
 #include "mapvisualizer.h"
@@ -55,8 +58,19 @@ private:
     QString mapFilePath;
     QString queriesFilePath;
     QString outputFilePath;
-    
+
+    //Queries/////////////---1---///////////////////
+    QLineEdit *queryLineEdit;
+    QLineEdit *startXEdit;
+    QLineEdit *startYEdit;
+    QLineEdit *endXEdit;
+    QLineEdit *endYEdit;
+
+    QStringList queryList;  // Stores all queries from file
+    int currentQueryIndex = 0;  // Tracks current query
+
     void setupUi();
     void displayResult(const QString &result);
+    void displayQuery(const QString &queryLine);
 };
 #endif // MAINWINDOW_H
