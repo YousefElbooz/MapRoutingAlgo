@@ -273,16 +273,16 @@ void MainWindow::findShortestPath()
         return;
     }
 
-    // Get values directly from the selected points on the visualizer
-    if (mapVisualizer->getStartPoint().isNull() || mapVisualizer->getEndPoint().isNull()) {
-        displayResult("Please select start and end points on the map first.");
+    bool ok1, ok2, ok3, ok4;
+    double startX = startXEdit->text().toDouble(&ok1);
+    double startY = startYEdit->text().toDouble(&ok2);
+    double endX = endXEdit->text().toDouble(&ok3);
+    double endY = endYEdit->text().toDouble(&ok4);
+
+    if (!ok1 || !ok2 || !ok3 || !ok4) {
+        displayResult("Invalid coordinate input.");
         return;
     }
-
-    double startX = mapVisualizer->getStartPoint().x();
-    double startY = mapVisualizer->getStartPoint().y();
-    double endX = mapVisualizer->getEndPoint().x();
-    double endY = mapVisualizer->getEndPoint().y();
 
     double R = REdit->text().toDouble();
 
@@ -296,6 +296,9 @@ void MainWindow::findShortestPath()
     result += "\nComputation time: " + QString::number(duration) + " ms";
 
     displayResult(result);
+
+    mapVisualizer->startPointSelected(startX, startY);
+    mapVisualizer->endPointSelected(endX, endY);
     mapVisualizer->update();
 }
 

@@ -94,10 +94,23 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
     }
     
     // Draw nodes
-    for (const auto& coords : nodes) {
-        QPointF center = transformCoordinates(coords.first, coords.second);
+    for (int node = 0; node < nodes.size(); ++node) {
+        QPointF center = transformCoordinates(nodes[node].first, nodes[node].second);
 
-        painter.setBrush(nodeColor);
+        // Check if this node is in the path
+        bool isInPath = false;
+        for (const auto& pathNode : path) {
+            if (node == pathNode) {
+                isInPath = true;
+                break;
+            }
+        }
+
+        if (isInPath) {
+            painter.setBrush(selectedNodeColor);
+        } else {
+            painter.setBrush(nodeColor);
+        }
         
         painter.setPen(Qt::black);
         painter.drawEllipse(center, nodeDiameter / 2, nodeDiameter / 2);
