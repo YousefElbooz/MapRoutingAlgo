@@ -2,10 +2,10 @@
 #include "qminmax.h"
 #include <iomanip>
 #include <chrono>
-#include <queue>
 #include <algorithm>
 #include <fstream>
 #include <iostream>
+#include <cmath>
 
 MapGraph::MapGraph() {}
 
@@ -169,10 +169,23 @@ bool MapGraph::loadQueriesFromFile(const std::string& filename) {
 }
 
 PathResult MapGraph::findShortestPath(double startX, double startY, double endX, double endY, double R) {
-    // Find closest nodes to start and end coordinates
-    std::vector<std::pair<int, double>> startNodes = findNodesWithinRadius(startX, startY, R);
-    std::vector<std::pair<int, double>> endNodes = findNodesWithinRadius(endX, endY, R);
+    // Priority queue for Dijkstra's algorithm - (distance, node)
+    priorityQueue pqForward;
+    priorityQueue pqBackward;
 
+    // Initialize arrays for Dijkstra's algorithm
+    std::vector<double> timeForward(nodePositions.size(), std::numeric_limits<double>::infinity());
+    std::vector<double> timeBackward(nodePositions.size(), std::numeric_limits<double>::infinity());
+    std::vector<double> distForward(nodePositions.size(), 0.0);
+    std::vector<double> distBackward(nodePositions.size(), 0.0);
+    std::vector<int> prevForward(nodePositions.size(), -1);
+    std::vector<int> prevBackward(nodePositions.size(), -1);
+    std::vector<bool> visitedStart(nodePositions.size(), false);
+    std::vector<bool> visitedEnd(nodePositions.size(), false);
+
+    // Find closest nodes to start and end coordinates
+    std::vector<std::pair<int, double>> startNodes = findNodesWithinRadius(startX, startY, endX, endY, R, pqForward, timeForward, distForward);
+    std::vector<std::pair<int, double>> endNodes = findNodesWithinRadius(endX, endY, startX, startY, R, pqBackward, timeBackward, distBackward);
 
     PathResult result;
     result.travelTime = std::numeric_limits<double>::infinity();
@@ -182,173 +195,117 @@ PathResult MapGraph::findShortestPath(double startX, double startY, double endX,
         return result;
     }
 
-    for (const auto& [startNode, startWalking] : startNodes) {
-        for (const auto& [endNode, endWalking] : endNodes) {
-            std::cerr << "Start Node: " << startNode << std::endl << "End Node: " << endNode << std::endl;
+    int meetingNode = -1;
 
-            // Print coordinates and found nodes for debugging
-            std::cerr << "Query: (" << startX << "," << startY << ") to (" << endX << "," << endY
-                      << "), R =" << R
-                      << " -> nodes: " << startNode << " to " << endNode << std::endl;
+    // Dijkstra's algorithm
+    while (!pqForward.empty() && !pqBackward.empty()) {
+        int currNodeForward = pqForward.top().second;
+        int currNodeBackward = pqBackward.top().second;
+        {
+            auto [currTime, currNode] = pqForward.top();
+            pqForward.pop();
+            if (visitedStart[currNode]) continue;
+            visitedStart[currNode] = true;
 
-            // If start and end are the same, return a simple path
-            if (startNode == endNode) {
-                result.path = {startNode};
-                result.travelTime = 0.0;
-                result.walkingDistance = 0.0;
-                result.vehicleDistance = 0.0;
-
-                std::stringstream ss;
-                ss << startNode << std::endl;
-                ss << std::fixed << std::setprecision(2) << result.travelTime << " mins" << std::endl;
-                ss << std::fixed << std::setprecision(2) << result.vehicleDistance + result.walkingDistance << " km" << std::endl;
-                ss << std::fixed << std::setprecision(2) << result.walkingDistance << " km" << std::endl;
-                ss << std::fixed << std::setprecision(2) << result.vehicleDistance << " km" << std::endl;
-
-                result.resultText = ss.str();
-                continue;
+            // Check if this node has been visited by backward search
+            if (visitedEnd[currNode]) {
+                double totalTime = timeForward[currNode] + timeBackward[currNode];
+                if (totalTime < result.travelTime) {
+                    meetingNode = currNode;
+                    result.travelTime = totalTime;
+                }
             }
+            // Check all neighbors
+            for (const auto& [neighbor, edge] : adjacencyList[currNode]) {
+                // Skip already visited nodes
+                double newTime = timeForward[currNode] + (edge.distance/edge.speed)*60;
 
-            // Make sure adjacency list is properly sized
-            if (adjacencyList.size() <= static_cast<size_t>(std::max(startNode, endNode))) {
-                std::cerr << "Error: Adjacency list not properly sized for nodes" << std::endl;
-                std::cerr << "Adjacency list size: " << adjacencyList.size() << ", needed: " << std::max(startNode, endNode) + 1 << std::endl;
-                result.path.clear();
-                result.travelTime = std::numeric_limits<double>::infinity();
-                result.vehicleDistance = 0.0;
-                result.walkingDistance = 0.0;
-                result.resultText = "Error: Adjacency list not properly sized";
-                continue;
-            }
-
-            // Check if the nodes have any neighbors
-            if (adjacencyList[startNode].empty()) {
-                std::cerr << "Error: Start node " << startNode << " has no neighbors" << std::endl;
-                result.path.clear();
-                result.travelTime = std::numeric_limits<double>::infinity();
-                result.vehicleDistance = 0.0;
-                result.walkingDistance = 0.0;
-                result.resultText = "Error: Start node has no neighbors";
-                continue;
-            }
-
-            if (adjacencyList[endNode].empty()) {
-                std::cerr << "Error: End node " << endNode << " has no neighbors" << std::endl;
-                result.path.clear();
-                result.travelTime = std::numeric_limits<double>::infinity();
-                result.vehicleDistance = 0.0;
-                result.walkingDistance = 0.0;
-                result.resultText = "Error: End node has no neighbors";
-                continue;
-            }
-
-            // Initialize arrays for Dijkstra's algorithm
-            std::vector<double> time(nodePositions.size(), std::numeric_limits<double>::infinity());
-            std::vector<double> dist(nodePositions.size(), 0.0);
-            std::vector<int> prev(nodePositions.size(), -1);
-            std::vector<bool> visited(nodePositions.size(), false);
-
-            // Priority queue for Dijkstra's algorithm - (distance, node)
-            std::priority_queue<std::pair<double, int>, std::vector<std::pair<double, int>>, std::greater<std::pair<double, int>>> pq;
-
-            // Start node has time 0
-            time[startNode] = 0.0;
-            pq.push({0.0, startNode});
-
-            // Dijkstra's algorithm
-            while (!pq.empty()) {
-                auto [currTime, currNode] = pq.top();
-                pq.pop();
-
-                // Skip if we've already processed this node
-                if (visited[currNode]) {
-                    continue;
+                if (visitedEnd[neighbor] && newTime + timeBackward[neighbor] < result.travelTime) {
+                    meetingNode = neighbor;
+                    result.travelTime = newTime + timeBackward[neighbor];
                 }
 
-                // Mark as visited
-                visited[currNode] = true;
-
-                // If we've reached the end node, we're done
-                if (currNode == endNode) {
-                    break;
-                }
-
-                // Ensure currNode is valid index for adjacencyList
-                if (currNode < 0 || currNode >= static_cast<int>(adjacencyList.size())) {
-                    std::cerr << "Error: Invalid node index " << currNode << " for adjacency list" << std::endl;
-                    continue;
-                }
-
-                // Check all neighbors
-                for (const auto& [neighbor, edge] : adjacencyList[currNode]) {
-                    // Skip already visited nodes
-                    if (visited[neighbor]) continue;
-
-                    double distance = edge.distance;
-                    double speed = edge.speed;
-                    double travelTime = (distance/speed)*60;
-
-                    // Relaxation step
-                    double newTime = time[currNode] + travelTime;
-                    double newDist = dist[currNode] + distance;
-                    if (newTime < time[neighbor]) {
-                        time[neighbor] = newTime;
-                        dist[neighbor] = newDist;
-                        prev[neighbor] = currNode;
-                        double heuristic = (calculateDistance(nodePositions[neighbor].first, nodePositions[neighbor].second,
-                                                              nodePositions[endNode].first, nodePositions[endNode].second)/max_speed)*60;
-                        pq.push({newTime + heuristic, neighbor});
-                    }
+                // Relaxation step
+                if (newTime < timeForward[neighbor]) {
+                    timeForward[neighbor] = newTime;
+                    distForward[neighbor] = distForward[currNode] + edge.distance;
+                    prevForward[neighbor] = currNode;
+                    pqForward.emplace(newTime, neighbor);
                 }
             }
 
-            if (time[endNode] + ((startWalking + endWalking)/5)*60 < result.travelTime) {
-                // Reconstruct path
-                std::vector<int> path;
-                for (int at = endNode; at != -1; at = prev[at]) {
-                    path.push_back(at);
+        }
+        {
+            auto [currTime, currNode] = pqBackward.top();
+            pqBackward.pop();
 
-                    // Safety check to avoid infinite loops
-                    if (path.size() > nodePositions.size()) {
-                        std::cerr << "Warning: Path reconstruction loop detected" << std::endl;
-                        break;
-                    }
+            if (visitedEnd[currNode]) continue;
+            visitedEnd[currNode] = true;
+
+            // Check if this node has been visited by forward search
+            if (visitedStart[currNode]) {
+                double totalTime = timeForward[currNode] + timeBackward[currNode];
+                if (totalTime < result.travelTime) {
+                    meetingNode = currNode;
+                    result.travelTime = totalTime;
+                }
+            }
+
+            // Check all neighbors
+            for (const auto& [neighbor, edge] : adjacencyList[currNode]) {
+                // Skip already visited nodes
+                double newTime = timeBackward[currNode] + (edge.distance/edge.speed)*60;
+
+                if (visitedStart[neighbor] && newTime + timeForward[neighbor] < result.travelTime) {
+                    meetingNode = neighbor;
+                    result.travelTime = newTime + timeForward[neighbor];
                 }
 
-                // Reverse the path to go from start to end
-                std::reverse(path.begin(), path.end());
-
-                // Check if path is valid
-                if (path.empty() || path.front() != startNode || path.back() != endNode) {
-                    std::cerr << "Error: Path reconstruction failed" << std::endl;
-                    if (!path.empty()) {
-                        std::cerr << "  Path starts at: " << path.front() << " (should be " << startNode << ")" << std::endl;
-                        std::cerr << "  Path ends at: " << path.back() << " (should be " << endNode << ")" << std::endl;
-                    }
-
-                    // Try direct path as fallback
-                    result.path = {startNode, endNode};
-                } else {
-                    lastPath = path;
-                    result.path = path;
+                // Relaxation step
+                if (newTime < timeBackward[neighbor]) {
+                    timeBackward[neighbor] = newTime;
+                    distBackward[neighbor] = distBackward[currNode] + edge.distance;
+                    prevBackward[neighbor] = currNode;
+                    pqBackward.emplace(newTime , neighbor);
                 }
-
-                // Calculate walking distance
-                result.walkingDistance = startWalking + endWalking;
-
-                // Calculate travel time (already computed during Dijkstra + time of walking distance)
-                result.travelTime = time[endNode] + (result.walkingDistance/5)*60;
-
-                // Calculate vehicle path distance (already computed during Dijkstra)
-                result.vehicleDistance = dist[endNode];
-
             }
         }
+        // Add a more efficient termination condition
+        if (timeForward[currNodeForward] + timeBackward[currNodeBackward] >= result.travelTime) break;
     }
 
+    if (meetingNode == -1) {
+        result.resultText = "Error: No valid path found";
+        return result;
+    }
 
+    // Reconstruct forward paths
+    std::vector<int> forwardPath;
+    for (int at = meetingNode; at != -1; at = prevForward[at]) {
+        forwardPath.push_back(at);
+    }
+    std::reverse(forwardPath.begin(), forwardPath.end());
 
-    //Debug output
+    // Reconstruct backward path
+    std::vector<int> backwardPath;
+    for (int at = prevBackward[meetingNode]; at != -1; at = prevBackward[at]) {
+        backwardPath.push_back(at);
+    }
+
+    result.path = forwardPath;
+    result.path.insert(result.path.end(), backwardPath.begin(), backwardPath.end());
+    lastPath = result.path;
+
+    // Calculate walking distance
+    result.walkingDistance = distForward[result.path[0]] + distBackward[result.path[result.path.size()-1]];
+
+    // Calculate total distance using Dijkstra's results
+    result.totalDistance = distForward[meetingNode] + distBackward[meetingNode];
+
+    // Calculate vehicle distance
+    result.vehicleDistance = result.totalDistance - result.walkingDistance;
+
+    // Debug output
     std::cerr << "Path found with " << result.path.size() << " nodes:" << std::endl;
     for (size_t i = 0; i < result.path.size(); i++) {
         std::cerr << result.path[i];
@@ -358,10 +315,10 @@ PathResult MapGraph::findShortestPath(double startX, double startY, double endX,
     }
     std::cerr << std::endl;
     std::cerr << "Travel time: " << result.travelTime << " mins" << std::endl;
-    std::cerr << "Total Distance: " << result.vehicleDistance + result.walkingDistance << " km" << std::endl;
+    std::cerr << "Total Distance: " << result.totalDistance << " km" << std::endl;
     std::cerr << "Walking distance: " << result.walkingDistance << " km" << std::endl;
     std::cerr << "Vehicle Distance: " << result.vehicleDistance << " km" << std::endl;
-    
+
     // Format result string
     std::stringstream ss;
     for (size_t i = 0; i < result.path.size(); i++) {
@@ -372,10 +329,10 @@ PathResult MapGraph::findShortestPath(double startX, double startY, double endX,
     }
     ss << std::endl;
     ss << std::fixed << std::setprecision(2) << result.travelTime << " mins" << std::endl;
-    ss << std::fixed << std::setprecision(2) << result.vehicleDistance + result.walkingDistance << " km" << std::endl;
+    ss << std::fixed << std::setprecision(2) << result.totalDistance<< " km" << std::endl;
     ss << std::fixed << std::setprecision(2) << result.walkingDistance << " km" << std::endl;
     ss << std::fixed << std::setprecision(2) << result.vehicleDistance << " km" << std::endl;
-    
+
     result.resultText = ss.str();
 
     return result;
@@ -586,11 +543,17 @@ std::string MapGraph::compareWithOutput(const std::string& outputFilename) {
     return result.str();
 }
 
-std::vector<std::pair<int, double>> MapGraph::findNodesWithinRadius(double x, double y, double R) {
+std::vector<std::pair<int, double>> MapGraph::findNodesWithinRadius(double x, double y, double endx, double endy, double R,
+    priorityQueue& pq, std::vector<double>& time, std::vector<double>& dist)
+{
+    const double WALKING_SPEED = 5.0; // km/h
     std::vector<std::pair<int, double>> result;
     for (int i = 0; i < nodePositions.size(); ++i) {
         double distance = calculateDistance(x, y, nodePositions[i].first, nodePositions[i].second);
         if (distance <= R) {
+            time[i] = (distance / WALKING_SPEED) * 60.0;
+            dist[i] = distance;
+            pq.emplace(time[i], i);
             result.emplace_back(i, distance);
         }
     }
