@@ -11,9 +11,7 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QGroupBox>
-
 #include <QCompleter>
-
 #include <memory>
 #include "mapgraph.h"
 #include "mapvisualizer.h"
