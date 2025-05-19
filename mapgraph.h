@@ -4,7 +4,7 @@
 #include <vector>
 #include <string>
 #include <queue>
-#define priorityQueue std::priority_queue<std::pair<double, int>, std::vector<std::pair<double, int>>, std::greater<std::pair<double, int>>>
+#define priorityQueue std::priority_queue<std::pair<double, int>, std::vector<std::pair<double, int>>, std::greater<>>
 
 struct Node {
     int id;
@@ -20,7 +20,6 @@ struct Edge {
 struct PathResult {
     std::vector<int> path;
     double travelTime;
-    double totalDistance;
     double walkingDistance;
     double vehicleDistance;
     std::string resultText;
@@ -37,7 +36,7 @@ public:
     PathResult findShortestPath(double startX, double startY, double endX, double endY, double R);
     std::string compareWithOutput(const std::string& outputFilename);
 
-    std::vector<std::pair<int, double>> findNodesWithinRadius(double x, double y, double endx, double endy, double R, priorityQueue& pq, std::vector<double>& time, std::vector<double>& dist);
+    std::vector<std::pair<int, double>> findNodesWithinRadius(double x, double y, double R);
 
     std::vector<PathResult> runAllQueries();
 

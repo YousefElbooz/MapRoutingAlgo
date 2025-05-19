@@ -52,7 +52,7 @@ bool MapGraph::loadMapFromFile(const std::string& filename) {
             }
             
             // Create spatial index for faster lookups
-            nodePositions.push_back({node.x, node.y});
+            nodePositions.emplace_back(node.x, node.y);
         }
         
         // Read number of edges
