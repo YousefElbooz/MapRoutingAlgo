@@ -177,7 +177,7 @@ void MainWindow::setupUi()
     pathLayout->addWidget(findPathButton);
     
     QPushButton *resetButton = new QPushButton("Reset", pathGroup);
-    connect(resetButton, &QPushButton::clicked, mapVisualizer, &MapVisualizer::reset);
+    connect(resetButton, &QPushButton::clicked, this, &MainWindow::handleResetAll);
     pathLayout->addWidget(resetButton);
     
     controlLayout->addWidget(pathGroup);
@@ -216,6 +216,15 @@ void MainWindow::loadMapFile()
     const auto startInMap = std::chrono::high_resolution_clock::now();
     if (mapGraph->loadMapFromFile(mapFilePath.toStdString())) {
         mapVisualizer->setMapGraph(mapGraph);
+
+        // === NEW: Reset map view and UI ===
+        if (mapVisualizer) mapVisualizer->reset();
+        handleResetAll();  // Also resets UI fields
+
+        // === NEW: Clear queries path info ===
+        queriesFilePath.clear();
+        queriesPathLabel->setText("No queries file selected");
+
         displayResult("Map file loaded successfully.");
     } else {
         displayResult("Error loading map file.");
@@ -390,4 +399,18 @@ void MainWindow::displayQuery(const Query &query, QString resultText) const {
     mapVisualizer->setEndPoint(query.endX, query.endY);
     displayResult(resultText);
     mapVisualizer->update();
+}
+
+void MainWindow::handleResetAll() {
+    if (mapVisualizer) {
+        mapVisualizer->reset();
+    }
+    if (outputTextEdit) outputTextEdit->clear();
+    if (queryIndexEdit) queryIndexEdit->clear();
+    if (startXEdit) startXEdit->clear();
+    if (startYEdit) startYEdit->clear();
+    if (endXEdit) endXEdit->clear();
+    if (endYEdit) endYEdit->clear();
+
+    currentQueryIndex = 0;
 }

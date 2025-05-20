@@ -37,6 +37,7 @@ class MapGraph {
 public:
     MapGraph();
     ~MapGraph();
+    void clearLastPath();
 
     bool empty();
     bool loadMapFromFile(const std::string& filename);

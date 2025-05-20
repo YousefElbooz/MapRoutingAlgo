@@ -20,7 +20,10 @@ public:
     void setMapGraph(const std::shared_ptr<MapGraph> &graph);
     void clearSelectionPoints();
     void reset();
-    
+    void resetZoom();
+    void clearOutput();
+    void resetUIState();
+
     // Getters for selected points
     QPointF getStartPoint() const { return startPoint; }
     QPointF getEndPoint() const { return endPoint; }

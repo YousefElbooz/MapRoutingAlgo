@@ -37,6 +37,7 @@ private slots:
     void onPointsSelected(double startX, double startY, double endX, double endY);
     void saveResults(const std::string& filename, const std::vector<PathResult>& results);
     void runAllQueries();
+    void handleResetAll();
 
     static void enableSelection();
 

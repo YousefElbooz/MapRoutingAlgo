@@ -40,9 +40,35 @@ void MapVisualizer::clearSelectionPoints() {
 void MapVisualizer::reset() {
     clearSelectionPoints();
     if (mapGraph) {
+        mapGraph->clearLastPath();
         calculateGraphBounds();
     }
+    // Reset zoom to default level
+    resetZoom();
+    // Clear outputs
+    clearOutput();
+    // Reset UI elements to their default state
+    resetUIState();
     update();
+}
+void MapVisualizer::resetZoom() {
+    scaleFactor = 1.0;
+    offset = QPointF(0, 0);
+    update();
+}
+
+void MapVisualizer::clearOutput() {
+    // No UI elements here, so just reset internal path/selection
+    //mapGraph->clearLastPath(); // Assuming you have this method
+    update();
+}
+
+void MapVisualizer::resetUIState() {
+    // No checkboxes or comboboxes in this class
+    // You can clear internal state flags if needed
+}
+void MapGraph::clearLastPath() {
+    lastPath.clear();
 }
 
 void MapVisualizer::paintEvent(QPaintEvent *event) {
@@ -66,7 +92,7 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
     std::vector<std::pair<double, double>> nodes = mapGraph->getNodes();
     
     // Draw edges
-    painter.setPen(QPen(edgeColor, 1));
+    painter.setPen(QPen(edgeColor, 0.8));
     for (const auto& edge : mapGraph->getEdges()) {
         const auto& source = nodes[edge.first];
         const auto& dest = nodes[edge.second];
