@@ -37,7 +37,8 @@ private slots:
     void onPointsSelected(double startX, double startY, double endX, double endY);
     void saveResults(const std::string& filename, const std::vector<PathResult>& results);
     void runAllQueries();
-    void enableSelection();
+
+    static void enableSelection();
 
 public:
     static bool isSelectionEnabled;
@@ -64,7 +65,7 @@ private:
     QLineEdit *endXEdit;
     QLineEdit *endYEdit;
 
-    QStringList queryList;  // Stores all queries from file
+    std::vector<Query> queryList;  // Stores all queries from file
     int currentQueryIndex = 0;  // Tracks current query
 
     long long timeIn;
@@ -72,7 +73,7 @@ private:
     long long timeBase;
 
     void setupUi();
-    void displayResult(const QString &result);
-    void displayQuery(const QString &queryLine);
+    void displayResult(const QString &result) const;
+    void displayQuery(const Query &query) const;
 };
 #endif // MAINWINDOW_H

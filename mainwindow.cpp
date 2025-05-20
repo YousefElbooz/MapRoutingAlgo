@@ -66,7 +66,7 @@ void MainWindow::setupUi()
     fileLayout->addLayout(queriesFileLayout);
     
     // Run all queries button
-    QPushButton *runAllQueriesButton = new QPushButton("Run All Queries & Compare", fileGroup);
+    QPushButton *runAllQueriesButton = new QPushButton("Run All Queries", fileGroup);
     connect(runAllQueriesButton, &QPushButton::clicked, this, &MainWindow::runAllQueries);
     fileLayout->addWidget(runAllQueriesButton);
     
@@ -96,8 +96,8 @@ void MainWindow::setupUi()
 
     // Navigation buttons
     QHBoxLayout *navButtonsLayout = new QHBoxLayout();
-    QPushButton *btnPrevQuery = new QPushButton("< Previous Query", queryNavGroup);
-    QPushButton *btnNextQuery = new QPushButton("Next Query >", queryNavGroup);
+    QPushButton *btnPrevQuery = new QPushButton("<-- Prev Query", queryNavGroup);
+    QPushButton *btnNextQuery = new QPushButton("Next Query -->", queryNavGroup);
     QPushButton *btnFindPath = new QPushButton("Find Path", queryNavGroup);
 
     navButtonsLayout->addWidget(btnPrevQuery);
@@ -128,13 +128,15 @@ void MainWindow::setupUi()
 
     // Adding select start/end button/////////////////////////////////////////////////////////////////
     QPushButton *enable_SE_Button = new QPushButton("Enable Start/End Selection", fileGroup);
+    enable_SE_Button->setStyleSheet("background-color: green; color: white;");
     enable_SE_Button->setCheckable(true);  // make it toggle
     enable_SE_Button->setChecked(true);   // default: off
     fileLayout->addWidget(enable_SE_Button);
     connect(enable_SE_Button, &QPushButton::toggled, this, [=](bool checked) {
         isSelectionEnabled = checked;
         enableSelection();
-        enable_SE_Button->setStyleSheet("background-color: green; color: white;");
+        enable_SE_Button->setStyleSheet(QString("background-color: %1; color: white;").arg(isSelectionEnabled ? "red" : "green"));
+        enable_SE_Button->setText((isSelectionEnabled ? "Disable Start/End Selection" : "Enable Start/End Selection"));
     });
 
 
@@ -186,7 +188,7 @@ void MainWindow::setupUi()
 
 void MainWindow::loadMapFile()
 {
-    QString filePath = QFileDialog::getOpenFileName(this, "Open Map File", "", "Text Files (*.txt)");
+    QString filePath = QFileDialog::getOpenFileName(this, "Open Map File", "../", "Text Files (*.txt)");
     if (filePath.isEmpty()) {
         return;
     }
@@ -205,7 +207,7 @@ void MainWindow::loadMapFile()
 void MainWindow::loadQueriesFile()
 {
     const auto startIn = std::chrono::high_resolution_clock::now();
-    QString filePath = QFileDialog::getOpenFileName(this, "Open Queries File", "", "Text Files (*.txt)");
+    QString filePath = QFileDialog::getOpenFileName(this, "Open Queries File", "../", "Text Files (*.txt)");
     if (filePath.isEmpty()) {
         return;
     }
@@ -221,27 +223,15 @@ void MainWindow::loadQueriesFile()
     const auto endIn = std::chrono::high_resolution_clock::now();
     timeIn = std::chrono::duration_cast<std::chrono::milliseconds>(endIn - startIn).count();
 
-    queryList.clear();
-    QFile file(queriesFilePath);
-    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QTextStream in(&file);
-        while (!in.atEnd()) {
-            QString line = in.readLine().trimmed();
-            if (!line.isEmpty()) queryList << line;
-        }
-        file.close();
-    }
+    queryList = mapGraph->getQueries();
 
-    if (queryList.isEmpty()) {
+    if (queryList.empty()) {
         QMessageBox::warning(this, "Invalid File", "The query file is empty or invalid.");
         return;
     }
 
     currentQueryIndex = 0;
     displayQuery(queryList[0]);
-
-    QCompleter *completer = new QCompleter(queryList, this);
-    completer->setCaseSensitivity(Qt::CaseInsensitive);
 }
 
 void MainWindow::findShortestPath()
@@ -350,8 +340,7 @@ void MainWindow::runAllQueries()
     mapVisualizer->update();
 }
 
-void MainWindow::displayResult(const QString &result)
-{
+void MainWindow::displayResult(const QString &result) const {
     outputTextEdit->setText(result);
     // Scroll to the top
     outputTextEdit->verticalScrollBar()->setValue(outputTextEdit->verticalScrollBar()->minimum());
@@ -364,21 +353,13 @@ void MainWindow::enableSelection()
     qDebug() << "Selection mode is now " << (isSelectionEnabled ? "ON" : "OFF");
 }
 
-void MainWindow::displayQuery(const QString &queryLine) {
-    QStringList parts = queryLine.split(QRegularExpression("\\s+"));
-    if (parts.size() >= 4) {
-        double startX = parts[0].toDouble();
-        double startY = parts[1].toDouble();
-        double endX = parts[2].toDouble();
-        double endY = parts[3].toDouble();
+void MainWindow::displayQuery(const Query &query) const {
+    startXEdit->setText(QString::number(query.startX));
+    startYEdit->setText(QString::number(query.startY));
+    endXEdit->setText(QString::number(query.endX));
+    endYEdit->setText(QString::number(query.endY));
 
-        startXEdit->setText(QString::number(startX));
-        startYEdit->setText(QString::number(startY));
-        endXEdit->setText(QString::number(endX));
-        endYEdit->setText(QString::number(endY));
-
-        mapVisualizer->startPointSelected(startX, startY);
-        mapVisualizer->endPointSelected(endX, endY);
-        mapVisualizer->update();
-    }
+    mapVisualizer->startPointSelected(query.startX, query.startY);
+    mapVisualizer->endPointSelected(query.endX, query.endY);
+    mapVisualizer->update();
 }

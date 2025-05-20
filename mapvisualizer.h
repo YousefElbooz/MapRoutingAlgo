@@ -17,7 +17,7 @@ public:
     explicit MapVisualizer(QWidget *parent = nullptr);
     ~MapVisualizer();
 
-    void setMapGraph(std::shared_ptr<MapGraph> graph);
+    void setMapGraph(const std::shared_ptr<MapGraph> &graph);
     void clearSelectionPoints();
     void reset();
     

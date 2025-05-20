@@ -5,14 +5,14 @@
 MapVisualizer::MapVisualizer(QWidget *parent)
     : QWidget(parent),
       isStartPointSelected(false),
-      nodeDiameter(0),
+      nodeDiameter(8),
       pathThickness(2),
       nodeColor(Qt::blue),
       edgeColor(Qt::green),
       pathColor(Qt::red),
       selectedNodeColor(Qt::green),
-      startPointColor(Qt::green),
-      endPointColor(Qt::red) {
+      startPointColor(Qt::blue),
+      endPointColor(Qt::magenta) {
     
     setMinimumSize(400, 400);
     setMouseTracking(true);
@@ -20,7 +20,7 @@ MapVisualizer::MapVisualizer(QWidget *parent)
 
 MapVisualizer::~MapVisualizer() {}
 
-void MapVisualizer::setMapGraph(std::shared_ptr<MapGraph> graph) {
+void MapVisualizer::setMapGraph(const std::shared_ptr<MapGraph> &graph) {
     mapGraph = graph;
     
     if (mapGraph) {
@@ -92,66 +92,77 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
             painter.drawLine(sourcePoint, destPoint);
         }
     }
-    
-    // Draw nodes
-    for (int node = 0; node < nodes.size(); ++node) {
-        QPointF center = transformCoordinates(nodes[node].first, nodes[node].second);
 
-        // Check if this node is in the path
-        bool isInPath = false;
-        for (const auto& pathNode : path) {
-            if (node == pathNode) {
-                isInPath = true;
-                break;
-            }
-        }
-
-        if (isInPath) {
-            painter.setBrush(selectedNodeColor);
-        } else {
-            painter.setBrush(nodeColor);
-        }
-        
-        painter.setPen(Qt::black);
-        painter.drawEllipse(center, nodeDiameter / 2, nodeDiameter / 2);
-    }
-    
     // Draw selected points
     if (startPoint.x() != 0 || startPoint.y() != 0) {
         painter.setBrush(startPointColor);
-        painter.setPen(Qt::white);
+        painter.setPen(Qt::black);
         QPointF transformedStart = transformCoordinates(startPoint.x(), startPoint.y());
-        painter.drawEllipse(transformedStart, nodeDiameter / 2, nodeDiameter / 2);
-        painter.drawText(transformedStart.x() - 4, transformedStart.y() - 10, "S");
+        painter.drawEllipse(transformedStart, nodeDiameter, nodeDiameter);
+        // Draw centered 'S' text
+        painter.setPen(Qt::white);
+        QFont font = painter.font();
+        font.setPointSize(nodeDiameter);
+        painter.setFont(font);
+        painter.drawText(transformedStart.x()-3, transformedStart.y()+4, "S");
     }
     
     if (endPoint.x() != 0 || endPoint.y() != 0) {
         painter.setBrush(endPointColor);
-        painter.setPen(Qt::white);
+        painter.setPen(Qt::black);
         QPointF transformedEnd = transformCoordinates(endPoint.x(), endPoint.y());
-        painter.drawEllipse(transformedEnd, nodeDiameter / 2, nodeDiameter / 2);
-        painter.drawText(transformedEnd.x() - 4, transformedEnd.y() - 10, "E");
+        painter.drawEllipse(transformedEnd, nodeDiameter, nodeDiameter);
+        // Draw centered 'E' text
+        painter.setPen(Qt::white);
+        QFont font = painter.font();
+        font.setPointSize(nodeDiameter);
+        painter.setFont(font);
+        painter.drawText(transformedEnd.x()-3, transformedEnd.y()+4, "E");
     }
 
-    painter.restore();  // Restore painter to original state (good practice)
+    painter.restore();  // Restore painter to original state
+}
+
+void MapVisualizer::mousePressEvent(QMouseEvent *event)
+{
+    if (!MainWindow::isSelectionEnabled && event->button() == Qt::LeftButton) {
+        isPanning = true;
+        lastMousePos = event->pos();
+        setCursor(Qt::ClosedHandCursor);
+    }
+    else {
+        isPanning = false;
+    }
+}
+
+void MapVisualizer::mouseMoveEvent(QMouseEvent *event)
+{
+    if (!MainWindow::isSelectionEnabled && isPanning) {
+        QPoint delta = event->pos() - lastMousePos;
+        offset += delta;
+        lastMousePos = event->pos();
+        update();
+    }
 }
 
 void MapVisualizer::mouseReleaseEvent(QMouseEvent *event) {
-    if (!mapGraph || !MainWindow::isSelectionEnabled) {
+    if (!mapGraph) {
         return;
     }
     
-    QPointF clickPoint = inverseTransformCoordinates(event->pos().x(), event->pos().y());
-    
-    if (!isStartPointSelected) {
-        startPoint = clickPoint;
-        isStartPointSelected = true;
-        emit startPointSelected(clickPoint.x(), clickPoint.y());
-    } else {
-        endPoint = clickPoint;
-        isStartPointSelected = false;
-        emit endPointSelected(clickPoint.x(), clickPoint.y());
-        emit pointsSelected(startPoint.x(), startPoint.y(), endPoint.x(), endPoint.y());
+    if (MainWindow::isSelectionEnabled) {
+        QPointF clickPoint = inverseTransformCoordinates(event->pos().x(), event->pos().y());
+        
+        if (!isStartPointSelected) {
+            startPoint = clickPoint;
+            isStartPointSelected = true;
+            emit startPointSelected(clickPoint.x(), clickPoint.y());
+        } else {
+            endPoint = clickPoint;
+            isStartPointSelected = false;
+            emit endPointSelected(clickPoint.x(), clickPoint.y());
+            emit pointsSelected(startPoint.x(), startPoint.y(), endPoint.x(), endPoint.y());
+        }
     }
     
     if (event->button() == Qt::LeftButton) {
@@ -193,6 +204,12 @@ QPointF MapVisualizer::transformCoordinates(double x, double y) const {
 }
 
 QPointF MapVisualizer::inverseTransformCoordinates(int pixelX, int pixelY) const {
+    // First, remove the offset to get coordinates relative to the original map position
+    QPointF adjustedPoint = QPointF(pixelX, pixelY) - offset;
+    
+    // Then remove the scale factor
+    adjustedPoint /= scaleFactor;
+    
     double width = this->width();
     double height = this->height();
     
@@ -216,8 +233,8 @@ QPointF MapVisualizer::inverseTransformCoordinates(int pixelX, int pixelY) const
     double offsetY = padding + (height - scaledHeight) / 2;
     
     // Inverse transform
-    double x = (pixelX - offsetX) / scale + graphBounds.left();
-    double y = graphBounds.top() + graphBounds.height() - (pixelY - offsetY) / scale;
+    double x = (adjustedPoint.x() - offsetX) / scale + graphBounds.left();
+    double y = graphBounds.top() + graphBounds.height() - (adjustedPoint.y() - offsetY) / scale;
     
     return QPointF(x, y);
 }
@@ -274,25 +291,4 @@ void MapVisualizer::wheelEvent(QWheelEvent *event)
 
 
     update();
-}
-
-void MapVisualizer::mousePressEvent(QMouseEvent *event)
-{
-    if (event->button() == Qt::LeftButton) {
-            isPanning = true;
-            lastMousePos = event->pos();
-            setCursor(Qt::ClosedHandCursor);
-    }
-    else
-       isPanning=false;
-}
-
-void MapVisualizer::mouseMoveEvent(QMouseEvent *event)
-{
-    if (isPanning) {
-        QPoint delta = event->pos() - lastMousePos;
-        offset += delta;
-        lastMousePos = event->pos();
-        update();
-    }
 }

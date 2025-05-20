@@ -17,6 +17,13 @@ struct Edge {
     double speed;
 };
 
+// For queries
+struct Query {
+    double startX, startY;
+    double endX, endY;
+    double R;
+};
+
 struct PathResult {
     std::vector<int> path;
     double travelTime;
@@ -42,14 +49,13 @@ public:
 
     std::vector<PathResult> runAllQueries();
 
-    // Getter and setter to help A* heuristics
-
     // Get nodes and edges
     std::vector<std::pair<double, double>> getNodes(){return nodePositions;}
     std::vector<std::pair<int,int>> getEdges(){return edges;}
     
     // Getters for visualization
     const std::vector<int>& getLastPath() const { return lastPath; }
+    const std::vector<Query>& getQueries() const { return queries; }
     
     // Get closest node to coordinates
     std::pair<int,double> findClosestNode(double x, double y) const;
@@ -61,13 +67,7 @@ private:
     // For faster lookups
     std::vector<std::pair<int,int>> edges;
     std::vector<std::pair<double, double>> nodePositions; // node id -> (x, y)
-    
-    // For queries
-    struct Query {
-        double startX, startY;
-        double endX, endY;
-        double R;
-    };
+
     std::vector<Query> queries;
     
     // For result tracking
