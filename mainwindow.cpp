@@ -65,16 +65,6 @@ void MainWindow::setupUi()
     queriesFileLayout->addWidget(queriesFileButton);
     fileLayout->addLayout(queriesFileLayout);
     
-    // Output file selection
-    QHBoxLayout *outputFileLayout = new QHBoxLayout();
-    outputPathLabel = new QLabel("No output file selected", fileGroup);
-    outputPathLabel->setWordWrap(true);
-    QPushButton *outputFileButton = new QPushButton("Select Output", fileGroup);
-    connect(outputFileButton, &QPushButton::clicked, this, &MainWindow::compareOutputFile);
-    outputFileLayout->addWidget(outputPathLabel);
-    outputFileLayout->addWidget(outputFileButton);
-    fileLayout->addLayout(outputFileLayout);
-    
     // Run all queries button
     QPushButton *runAllQueriesButton = new QPushButton("Run All Queries & Compare", fileGroup);
     connect(runAllQueriesButton, &QPushButton::clicked, this, &MainWindow::runAllQueries);
@@ -214,11 +204,11 @@ void MainWindow::loadMapFile()
 
 void MainWindow::loadQueriesFile()
 {
+    const auto startIn = std::chrono::high_resolution_clock::now();
     QString filePath = QFileDialog::getOpenFileName(this, "Open Queries File", "", "Text Files (*.txt)");
     if (filePath.isEmpty()) {
         return;
     }
-
     queriesFilePath = filePath;
     queriesPathLabel->setText(queriesFilePath);
 
@@ -228,6 +218,8 @@ void MainWindow::loadQueriesFile()
         displayResult("Error loading queries file.");
         return;
     }
+    const auto endIn = std::chrono::high_resolution_clock::now();
+    timeIn = std::chrono::duration_cast<std::chrono::milliseconds>(endIn - startIn).count();
 
     queryList.clear();
     QFile file(queriesFilePath);
@@ -250,20 +242,6 @@ void MainWindow::loadQueriesFile()
 
     QCompleter *completer = new QCompleter(queryList, this);
     completer->setCaseSensitivity(Qt::CaseInsensitive);
-}
-
-void MainWindow::compareOutputFile()
-{
-    QString filePath = QFileDialog::getOpenFileName(this, "Open Output File", "", "Text Files (*.txt)");
-    if (filePath.isEmpty()) {
-        return;
-    }
-    
-    outputFilePath = filePath;
-    outputPathLabel->setText(outputFilePath);
-    
-    QString result = QString::fromStdString(mapGraph->compareWithOutput(outputFilePath.toStdString()));
-    displayResult("Comparison results:\n" + result);
 }
 
 void MainWindow::findShortestPath()
@@ -319,6 +297,23 @@ void MainWindow::onPointsSelected(double startX, double startY, double endX, dou
     mapVisualizer->update();
 }
 
+void MainWindow::saveResults(const std::string& filename, const std::vector<PathResult>& results) {
+    const auto startOut = std::chrono::high_resolution_clock::now();
+    std::ofstream out(filename);
+
+    for (const auto& res : results) {
+        out << res.resultText << "\n";
+    }
+    const auto endOut = std::chrono::high_resolution_clock::now();
+    timeOut = std::chrono::duration_cast<std::chrono::milliseconds>(endOut - startOut).count();
+
+    // Execution times would normally go here (for lab measurement)
+    out << timeBase <<" ms\n\n"; // placeholder
+    out << timeIn + timeBase + timeOut <<" ms\n"; // placeholder
+
+    out.close();
+}
+
 void MainWindow::runAllQueries()
 {
     if (mapGraph->empty()) {
@@ -330,12 +325,7 @@ void MainWindow::runAllQueries()
         displayResult("Error: No queries file loaded.");
         return;
     }
-    
-    if (outputFilePath.isEmpty()) {
-        displayResult("Error: No output file selected for comparison.");
-        return;
-    }
-    
+
     // Start timer for all queries
     auto startAll = std::chrono::high_resolution_clock::now();
     
@@ -344,41 +334,18 @@ void MainWindow::runAllQueries()
     
     // End timer for all queries
     auto endAll = std::chrono::high_resolution_clock::now();
-    auto durationAll = std::chrono::duration_cast<std::chrono::milliseconds>(endAll - startAll).count();
-    
+    timeBase = std::chrono::duration_cast<std::chrono::milliseconds>(endAll - startAll).count();
+
+    saveResults("../Output/outputs.txt", results);
+
     // Format the results
     QString resultText;
     resultText += "Executed " + QString::number(results.size()) + " queries in " + 
-                  QString::number(durationAll) + " ms\n\n";
+                  QString::number(timeBase) + " ms\nExecution time + I/O: " +
+                  QString::number(timeIn + timeBase + timeOut) + " ms\n\n";
+    resultText += QString::fromStdString(mapGraph->displayOutput(results));
     
-    // Compare with expected output
-    std::ifstream outputFile(outputFilePath.toStdString());
-    if (!outputFile.is_open()) {
-        resultText += "Error: Could not open output file for comparison.";
-        displayResult(resultText);
-        return;
-    }
-    outputFile.close();
-    
-    // Run comparison
-    QString comparisonResult = QString::fromStdString(mapGraph->compareWithOutput(outputFilePath.toStdString()));
-    
-    // Extract summary metrics if present
-    int summaryPos = comparisonResult.indexOf("===== SUMMARY STATISTICS =====");
-    QString summary;
-    if (summaryPos != -1) {
-        summary = comparisonResult.mid(summaryPos);
-        comparisonResult = comparisonResult.left(summaryPos);
-    }
-    
-    // Combine results and display
-    resultText += "COMPARISON SUMMARY:\n";
-    if (!summary.isEmpty()) {
-        resultText += summary + "\n\n";
-    }
-    resultText += "DETAILED RESULTS:\n" + comparisonResult;
-    
-    // Display results and update visualization with the last query's path
+    // Display results and update visualization
     displayResult(resultText);
     mapVisualizer->update();
 }

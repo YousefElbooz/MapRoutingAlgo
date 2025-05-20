@@ -338,220 +338,34 @@ PathResult MapGraph::findShortestPath(double startX, double startY, double endX,
     return result;
 }
 
-std::string MapGraph::compareWithOutput(const std::string& outputFilename) {
-    std::ifstream file(outputFilename);
-    if (!file.is_open()) {
-        return "Error opening output file: " + outputFilename;
-    }
-    
+std::string MapGraph::displayOutput(const std::vector<PathResult> &results) const {
+
     std::stringstream result;
     std::string line;
-    int queryNumber = 0;
+    int queryNumber = queries.size();
     bool hasMoreQueries = true;
-    
-    // Accuracy metrics
-    int totalPathMatches = 0;
-    double totalTimeError = 0.0;
-    double totalDistanceError = 0.0;
-    double totalWalkingDistanceError = 0.0;
-    double totalVehicleDistanceError = 0.0;
-    double totalExecTime = 0.0;
-    
-    // Make sure we have queries loaded
-    if (queries.empty()) {
-        return "Error: No queries loaded. Please load queries first.";
-    }
-    
-    while (hasMoreQueries && queryNumber < static_cast<int>(queries.size())) {
-        std::vector<int> expectedPath;
-        double expectedTime = 0.0;
-        double expectedTotalDistance = 0.0;
-        double expectedWalkingDistance = 0.0;
-        double expectedVehicleDistance = 0.0;
 
-        // Read the expected path
-        if (std::getline(file, line)) {
-            // Check if this is a blank line separating query results
-            if (line.empty()) {
-                continue;
-            }
-            
-            std::istringstream iss(line);
-            int nodeId;
-            while (iss >> nodeId) {
-                expectedPath.push_back(nodeId);
-            }
-        } else {
-            hasMoreQueries = false;
-            break;
-        }
-        
-        // Read expected travel time
-        if (std::getline(file, line)) {
-            // Extract number from "X.XX mins" format
-            size_t pos = line.find(" mins");
-            if (pos != std::string::npos) {
-                expectedTime = std::stod(line.substr(0, pos));
-            }
-        } else {
-            hasMoreQueries = false;
-            break;
-        }
-        
-        // Read expected total distance
-        if (std::getline(file, line)) {
-            // Extract number from "X.XX km" format
-            size_t pos = line.find(" km");
-            if (pos != std::string::npos) {
-                expectedTotalDistance = std::stod(line.substr(0, pos));
-            }
-        } else {
-            hasMoreQueries = false;
-            break;
-        }
-        
-        // Read expected walking distance
-        if (std::getline(file, line)) {
-            // Extract number from "X.XX km" format
-            size_t pos = line.find(" km");
-            if (pos != std::string::npos) {
-                expectedWalkingDistance = std::stod(line.substr(0, pos));
-            }
-        } else {
-            hasMoreQueries = false;
-            break;
-        }
-
-        // Read expected vehicle distance
-        if (std::getline(file, line)) {
-            // Extract number from "X.XX km" format
-            size_t pos = line.find(" km");
-            if (pos != std::string::npos) {
-                expectedVehicleDistance = std::stod(line.substr(0, pos));
-            }
-        } else {
-            hasMoreQueries = false;
-            break;
-        }
-        
-        queryNumber++;
-        
-        // Get the current query
-        const Query& currentQuery = queries[queryNumber - 1];
-        
-        std::cerr << "\n=== Processing comparison for Query #" << queryNumber << " ===" << std::endl;
-        
-        // Compute the actual path for this specific query
-        auto startTime = std::chrono::high_resolution_clock::now();
-        PathResult pathResult = findShortestPath(currentQuery.startX, currentQuery.startY,
-                                                 currentQuery.endX, currentQuery.endY,
-                                                 currentQuery.R);
-        auto endTime = std::chrono::high_resolution_clock::now();
-        double execTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count() / 1000.0;
-        totalExecTime += execTime;
-        
-        // Compare results
-        result << "Query #" << queryNumber << ":\n";
-        
-        // Compare paths
-        bool pathMatch = (expectedPath == pathResult.path);
-        if (pathMatch) {
-            totalPathMatches++;
-        }
-        result << "  Path match: " << (pathMatch ? "Yes" : "No") << std::endl;
-        
-        if (!pathMatch) {
-            result << "  Expected path: ";
-            for (const auto& node : expectedPath) {
-                result << node << " ";
-            }
-            result << std::endl;
-            
-            result << "  Actual path: ";
-            for (const auto& node : pathResult.path) {
-                result << node << " ";
-            }
-            result << std::endl;
-        }
-        
-        // Compare times
-        double timeError = std::abs(expectedTime - pathResult.travelTime);
-        totalTimeError += timeError;
-        result << "  Time error: " << std::fixed << std::setprecision(2) << timeError << " mins";
-        if (timeError > 0.01) {
-            result << " (Expected: " << expectedTime << ", Actual: " << pathResult.travelTime << ")";
-        }
-        result << std::endl;
-        
-        // Compare distances
-        double distanceError = std::abs(expectedTotalDistance - (pathResult.walkingDistance + pathResult.vehicleDistance));
-        totalDistanceError += distanceError;
-        result << "  Distance error: " << std::fixed << std::setprecision(2) << distanceError << " km";
-        if (distanceError > 0.01) {
-            result << " (Expected: " << expectedTotalDistance << ", Actual: " << (pathResult.walkingDistance + pathResult.vehicleDistance) << ")";
-        }
-        result << std::endl;
-        
-        // Compare walking distances
-        double walkingDistanceError = std::abs(expectedWalkingDistance - pathResult.walkingDistance);
-        totalWalkingDistanceError += walkingDistanceError;
-        result << "  Direct distance error: " << std::fixed << std::setprecision(2) << walkingDistanceError << " km";
-        if (walkingDistanceError > 0.01) {
-            result << " (Expected: " << expectedWalkingDistance << ", Actual: " << pathResult.walkingDistance << ")";
-        }
-        result << std::endl;
-
-        // Compare vehicle distances
-        double vehicleDistanceError = std::abs(expectedVehicleDistance - pathResult.vehicleDistance);
-        totalVehicleDistanceError += vehicleDistanceError;
-        result << "  Direct distance error: " << std::fixed << std::setprecision(2) << vehicleDistanceError << " km";
-        if (vehicleDistanceError > 0.01) {
-            result << " (Expected: " << expectedVehicleDistance << ", Actual: " << pathResult.vehicleDistance << ")";
-        }
-        result << std::endl;
-        
-        // Execution time for this query
-        result << "  Execution time: " << std::fixed << std::setprecision(3) << execTime << " seconds" << std::endl;
-        
-        // Read blank line separating queries (if any)
-        std::getline(file, line);
-    }
-    
-    file.close();
-    
     if (queryNumber == 0) {
         return "No valid query results found in the output file.";
     }
     
-    // Add summary metrics
-    double pathMatchAccuracy = (queryNumber > 0) ? (static_cast<double>(totalPathMatches) / queryNumber) * 100.0 : 0.0;
-    double avgTimeError = (queryNumber > 0) ? totalTimeError / queryNumber : 0.0;
-    double avgDistanceError = (queryNumber > 0) ? totalDistanceError / queryNumber : 0.0;
-    double avgWalkingDistanceError = (queryNumber > 0) ? totalWalkingDistanceError / queryNumber : 0.0;
-    double avgVehicleDistanceError = (queryNumber > 0) ? totalVehicleDistanceError / queryNumber : 0.0;
-    
     result << "\n===== SUMMARY STATISTICS =====\n";
-    result << "Total queries processed: " << queryNumber << std::endl;
-    result << "Path match accuracy: " << std::fixed << std::setprecision(2) << pathMatchAccuracy 
-           << "% (" << totalPathMatches << "/" << queryNumber << " correct)" << std::endl;
-    result << "Average time error: " << std::fixed << std::setprecision(2) << avgTimeError << " mins" << std::endl;
-    result << "Average total distance error: " << std::fixed << std::setprecision(2) << avgDistanceError << " km" << std::endl;
-    result << "Average walking distance error: " << std::fixed << std::setprecision(2) << avgWalkingDistanceError << " km" << std::endl;
-    result << "Average vehicle distance error: " << std::fixed << std::setprecision(2) << avgVehicleDistanceError << " km" << std::endl;
-    result << "Total execution time: " << std::fixed << std::setprecision(3) << totalExecTime << " seconds" << std::endl;
+    result << "Total queries processed: " << queryNumber << std::endl << std::endl;
+    for (int i = 0; i < queryNumber; i++) {
+        result << "-----------------\n";
+        result << "Query #" << i+1 << ":\n" << results[i].resultText << std::endl;
+    }
     
     return result.str();
 }
 
 std::vector<std::pair<int, double>> MapGraph::findNodesWithinRadius(double x, double y, double endx, double endy, double R,
-    priorityQueue& pq, std::vector<double>& time, std::vector<double>& dist)
-{
-    const double WALKING_SPEED = 5.0; // km/h
+    priorityQueue& pq, std::vector<double>& time, std::vector<double>& dist) const {
     std::vector<std::pair<int, double>> result;
     for (int i = 0; i < nodePositions.size(); ++i) {
         double distance = calculateDistance(x, y, nodePositions[i].first, nodePositions[i].second);
         if (distance <= R) {
-            time[i] = (distance / WALKING_SPEED) * 60.0;
+            time[i] = (distance / 5.0) * 60.0;
             dist[i] = distance;
             pq.emplace(time[i], i);
             result.emplace_back(i, distance);
@@ -560,7 +374,7 @@ std::vector<std::pair<int, double>> MapGraph::findNodesWithinRadius(double x, do
     return result;
 }
 
-double MapGraph::calculateDistance(double x1, double y1, double x2, double y2) const {
+double MapGraph::calculateDistance(double x1, double y1, double x2, double y2) {
     return std::sqrt(std::pow(x2 - x1, 2) + std::pow(y2 - y1, 2));
 }
 
@@ -587,13 +401,7 @@ std::vector<PathResult> MapGraph::runAllQueries() {
                 
                 // Compute the actual path by finding the shortest path
                 result = findShortestPath(query.startX, query.startY, query.endX, query.endY, query.R);
-                
-                // After findShortestPath has run, the lastPath, lastTravelTime etc. will be populated
-                // result.path = lastPath;
-                // result.travelTime = lastTravelTime;
-                // result.distance = lastDistance;
-                // result.directDistance = lastDirectDistance;
-                
+
                 // Debug output
                 std::cerr << "Query #" << (i+1) << " result: " << std::endl;
                 std::cerr << "  Path: ";

@@ -33,9 +33,9 @@ public:
 private slots:
     void loadMapFile();
     void loadQueriesFile();
-    void compareOutputFile();
     void findShortestPath();
     void onPointsSelected(double startX, double startY, double endX, double endY);
+    void saveResults(const std::string& filename, const std::vector<PathResult>& results);
     void runAllQueries();
     void enableSelection();
 
@@ -66,6 +66,10 @@ private:
 
     QStringList queryList;  // Stores all queries from file
     int currentQueryIndex = 0;  // Tracks current query
+
+    long long timeIn;
+    long long timeOut;
+    long long timeBase;
 
     void setupUi();
     void displayResult(const QString &result);
