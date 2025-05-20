@@ -25,6 +25,10 @@ public:
     QPointF getStartPoint() const { return startPoint; }
     QPointF getEndPoint() const { return endPoint; }
     
+    // Setters for points
+    void setStartPoint(double x, double y) { startPoint = QPointF(x, y); update(); }
+    void setEndPoint(double x, double y) { endPoint = QPointF(x, y); update(); }
+    
     // Coordinate transformation
     QPointF transformCoordinates(double x, double y) const;
     QPointF inverseTransformCoordinates(int pixelX, int pixelY) const;

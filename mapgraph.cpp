@@ -394,11 +394,6 @@ std::vector<PathResult> MapGraph::runAllQueries() {
             
             PathResult result;
             try {
-                std::cerr << "\n\n=== Processing Query #" << (i+1) << " ===" << std::endl;
-                std::cerr << "Coordinates: (" << query.startX << ", " << query.startY 
-                          << ") to (" << query.endX << ", " << query.endY 
-                          << "), maxSpeed: " << query.R << std::endl;
-                
                 // Compute the actual path by finding the shortest path
                 result = findShortestPath(query.startX, query.startY, query.endX, query.endY, query.R);
 

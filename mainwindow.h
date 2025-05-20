@@ -64,6 +64,7 @@ private:
     QLineEdit *startYEdit;
     QLineEdit *endXEdit;
     QLineEdit *endYEdit;
+    QLineEdit *queryIndexEdit;
 
     std::vector<Query> queryList;  // Stores all queries from file
     int currentQueryIndex = 0;  // Tracks current query
@@ -74,6 +75,6 @@ private:
 
     void setupUi();
     void displayResult(const QString &result) const;
-    void displayQuery(const Query &query) const;
+    void displayQuery(const Query &query, QString resultText) const;
 };
 #endif // MAINWINDOW_H

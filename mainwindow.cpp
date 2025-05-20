@@ -97,12 +97,15 @@ void MainWindow::setupUi()
     // Navigation buttons
     QHBoxLayout *navButtonsLayout = new QHBoxLayout();
     QPushButton *btnPrevQuery = new QPushButton("<-- Prev Query", queryNavGroup);
+    queryIndexEdit = new QLineEdit(queryNavGroup);
+    queryIndexEdit->setAlignment(Qt::AlignCenter);
+    queryIndexEdit->setPlaceholderText("Query Number");
     QPushButton *btnNextQuery = new QPushButton("Next Query -->", queryNavGroup);
-    QPushButton *btnFindPath = new QPushButton("Find Path", queryNavGroup);
+
 
     navButtonsLayout->addWidget(btnPrevQuery);
+    navButtonsLayout->addWidget(queryIndexEdit);
     navButtonsLayout->addWidget(btnNextQuery);
-    navButtonsLayout->addWidget(btnFindPath);
 
     queryNavLayout->addLayout(navButtonsLayout);
     controlLayout->addWidget(queryNavGroup);
@@ -111,20 +114,34 @@ void MainWindow::setupUi()
     connect(btnPrevQuery, &QPushButton::clicked, this, [=]() {
         if (currentQueryIndex > 0) {
             currentQueryIndex--;
-            displayQuery(queryList[currentQueryIndex]);
+            Query query = queryList[currentQueryIndex];
+            QString resultText = QString::fromStdString(mapGraph->findShortestPath(query.startX, query.startY, query.endX, query.endY, query.R).resultText);
+            displayQuery(query, resultText);
         }
     });
 
     connect(btnNextQuery, &QPushButton::clicked, this, [=]() {
         if (currentQueryIndex < queryList.size() - 1) {
             currentQueryIndex++;
-            displayQuery(queryList[currentQueryIndex]);
+            Query query = queryList[currentQueryIndex];
+            QString resultText = QString::fromStdString(mapGraph->findShortestPath(query.startX, query.startY, query.endX, query.endY, query.R).resultText);
+            displayQuery(query, resultText);
         }
     });
 
-    // Connect Find Path
-    connect(btnFindPath, &QPushButton::clicked, this, &MainWindow::findShortestPath);
-
+    // Connect query index input
+    connect(queryIndexEdit, &QLineEdit::returnPressed, this, [=]() {
+        bool ok;
+        int newIndex = queryIndexEdit->text().toInt(&ok) - 1; // Convert to 0-based index
+        if (ok && newIndex >= 0 && newIndex < queryList.size()) {
+            currentQueryIndex = newIndex;
+            Query query = queryList[currentQueryIndex];
+            QString resultText = QString::fromStdString(mapGraph->findShortestPath(query.startX, query.startY, query.endX, query.endY, query.R).resultText);
+            displayQuery(query, resultText);
+        } else {
+            queryIndexEdit->setText(QString::number(currentQueryIndex + 1)); // Reset to current index if invalid
+        }
+    });
 
     // Adding select start/end button/////////////////////////////////////////////////////////////////
     QPushButton *enable_SE_Button = new QPushButton("Enable Start/End Selection", fileGroup);
@@ -206,7 +223,7 @@ void MainWindow::loadMapFile()
 
 void MainWindow::loadQueriesFile()
 {
-    const auto startIn = std::chrono::high_resolution_clock::now();
+    timeIn = 0;
     QString filePath = QFileDialog::getOpenFileName(this, "Open Queries File", "../", "Text Files (*.txt)");
     if (filePath.isEmpty()) {
         return;
@@ -214,6 +231,7 @@ void MainWindow::loadQueriesFile()
     queriesFilePath = filePath;
     queriesPathLabel->setText(queriesFilePath);
 
+    const auto startIn = std::chrono::high_resolution_clock::now();
     if (mapGraph->loadQueriesFromFile(queriesFilePath.toStdString())) {
         displayResult("Queries file loaded successfully.");
     } else {
@@ -231,7 +249,9 @@ void MainWindow::loadQueriesFile()
     }
 
     currentQueryIndex = 0;
-    displayQuery(queryList[0]);
+    Query query = queryList[currentQueryIndex];
+    QString resultText = QString::fromStdString(mapGraph->findShortestPath(query.startX, query.startY, query.endX, query.endY, query.R).resultText);
+    displayQuery(query, resultText);
 }
 
 void MainWindow::findShortestPath()
@@ -288,6 +308,7 @@ void MainWindow::onPointsSelected(double startX, double startY, double endX, dou
 }
 
 void MainWindow::saveResults(const std::string& filename, const std::vector<PathResult>& results) {
+    timeOut = 0;
     const auto startOut = std::chrono::high_resolution_clock::now();
     std::ofstream out(filename);
 
@@ -315,7 +336,7 @@ void MainWindow::runAllQueries()
         displayResult("Error: No queries file loaded.");
         return;
     }
-
+    timeBase = 0;
     // Start timer for all queries
     auto startAll = std::chrono::high_resolution_clock::now();
     
@@ -336,8 +357,8 @@ void MainWindow::runAllQueries()
     resultText += QString::fromStdString(mapGraph->displayOutput(results));
     
     // Display results and update visualization
-    displayResult(resultText);
-    mapVisualizer->update();
+    currentQueryIndex = queryList.size() - 1;
+    displayQuery(queryList[currentQueryIndex], resultText);
 }
 
 void MainWindow::displayResult(const QString &result) const {
@@ -353,13 +374,16 @@ void MainWindow::enableSelection()
     qDebug() << "Selection mode is now " << (isSelectionEnabled ? "ON" : "OFF");
 }
 
-void MainWindow::displayQuery(const Query &query) const {
+void MainWindow::displayQuery(const Query &query, QString resultText) const {
     startXEdit->setText(QString::number(query.startX));
     startYEdit->setText(QString::number(query.startY));
     endXEdit->setText(QString::number(query.endX));
     endYEdit->setText(QString::number(query.endY));
+    REdit->setText(QString::number(query.R));
+    queryIndexEdit->setText(QString::number(currentQueryIndex + 1));
 
-    mapVisualizer->startPointSelected(query.startX, query.startY);
-    mapVisualizer->endPointSelected(query.endX, query.endY);
+    mapVisualizer->setStartPoint(query.startX, query.startY);
+    mapVisualizer->setEndPoint(query.endX, query.endY);
+    displayResult(resultText);
     mapVisualizer->update();
 }

@@ -5,7 +5,7 @@
 MapVisualizer::MapVisualizer(QWidget *parent)
     : QWidget(parent),
       isStartPointSelected(false),
-      nodeDiameter(8),
+      nodeDiameter(6),
       pathThickness(2),
       nodeColor(Qt::blue),
       edgeColor(Qt::green),
@@ -104,7 +104,7 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
         QFont font = painter.font();
         font.setPointSize(nodeDiameter);
         painter.setFont(font);
-        painter.drawText(transformedStart.x()-3, transformedStart.y()+4, "S");
+        painter.drawText(transformedStart.x()-2, transformedStart.y()+3, "S");
     }
     
     if (endPoint.x() != 0 || endPoint.y() != 0) {
@@ -117,7 +117,7 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
         QFont font = painter.font();
         font.setPointSize(nodeDiameter);
         painter.setFont(font);
-        painter.drawText(transformedEnd.x()-3, transformedEnd.y()+4, "E");
+        painter.drawText(transformedEnd.x()-2, transformedEnd.y()+3, "E");
     }
 
     painter.restore();  // Restore painter to original state
