@@ -205,25 +205,29 @@ void MainWindow::setupUi()
 
 void MainWindow::loadMapFile()
 {
+    timeInMap = 0;
     QString filePath = QFileDialog::getOpenFileName(this, "Open Map File", "../", "Text Files (*.txt)");
     if (filePath.isEmpty()) {
         return;
     }
-    
     mapFilePath = filePath;
     mapPathLabel->setText(mapFilePath);
-    
+
+    const auto startInMap = std::chrono::high_resolution_clock::now();
     if (mapGraph->loadMapFromFile(mapFilePath.toStdString())) {
         mapVisualizer->setMapGraph(mapGraph);
         displayResult("Map file loaded successfully.");
     } else {
         displayResult("Error loading map file.");
+        return;
     }
+    const auto endInMap = std::chrono::high_resolution_clock::now();
+    timeInMap = std::chrono::duration_cast<std::chrono::milliseconds>(endInMap - startInMap).count();
 }
 
 void MainWindow::loadQueriesFile()
 {
-    timeIn = 0;
+    timeInQuery = 0;
     QString filePath = QFileDialog::getOpenFileName(this, "Open Queries File", "../", "Text Files (*.txt)");
     if (filePath.isEmpty()) {
         return;
@@ -231,15 +235,15 @@ void MainWindow::loadQueriesFile()
     queriesFilePath = filePath;
     queriesPathLabel->setText(queriesFilePath);
 
-    const auto startIn = std::chrono::high_resolution_clock::now();
+    const auto startInQuery = std::chrono::high_resolution_clock::now();
     if (mapGraph->loadQueriesFromFile(queriesFilePath.toStdString())) {
         displayResult("Queries file loaded successfully.");
     } else {
         displayResult("Error loading queries file.");
         return;
     }
-    const auto endIn = std::chrono::high_resolution_clock::now();
-    timeIn = std::chrono::duration_cast<std::chrono::milliseconds>(endIn - startIn).count();
+    const auto endInQuery = std::chrono::high_resolution_clock::now();
+    timeInQuery = std::chrono::duration_cast<std::chrono::milliseconds>(endInQuery - startInQuery).count();
 
     queryList = mapGraph->getQueries();
 
@@ -320,7 +324,7 @@ void MainWindow::saveResults(const std::string& filename, const std::vector<Path
 
     // Execution times would normally go here (for lab measurement)
     out << timeBase <<" ms\n\n"; // placeholder
-    out << timeIn + timeBase + timeOut <<" ms\n"; // placeholder
+    out << timeInMap + timeInQuery + timeBase + timeOut <<" ms\n"; // placeholder
 
     out.close();
 }
@@ -353,7 +357,7 @@ void MainWindow::runAllQueries()
     QString resultText;
     resultText += "Executed " + QString::number(results.size()) + " queries in " + 
                   QString::number(timeBase) + " ms\nExecution time + I/O: " +
-                  QString::number(timeIn + timeBase + timeOut) + " ms\n\n";
+                  QString::number(timeInMap + timeInQuery + timeBase + timeOut) + " ms\n\n";
     resultText += QString::fromStdString(mapGraph->displayOutput(results));
     
     // Display results and update visualization

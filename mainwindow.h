@@ -69,7 +69,8 @@ private:
     std::vector<Query> queryList;  // Stores all queries from file
     int currentQueryIndex = 0;  // Tracks current query
 
-    long long timeIn;
+    long long timeInMap;
+    long long timeInQuery;
     long long timeOut;
     long long timeBase;
 
