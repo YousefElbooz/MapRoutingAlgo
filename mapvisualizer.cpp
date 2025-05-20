@@ -301,20 +301,13 @@ void MapVisualizer::wheelEvent(QWheelEvent *event)
     double factor = (event->angleDelta().y() > 0) ? 1.1 : 0.9;
 
     // Optional: zoom centered around the cursor
-    QPointF cursorPos = event->position(); // Qt 5.14+
+    QPointF cursorPos = event->position();
     QPointF beforeScale = (cursorPos - offset) / scaleFactor;
 
     scaleFactor *= factor;
 
     QPointF afterScale = beforeScale * scaleFactor;
     offset += (cursorPos - offset) - afterScale;
-
-    double newScale = scaleFactor * factor;
-    if (newScale >= 1.0) {  // 1.0 = default size
-        scaleFactor = newScale;
-        update(); // or repaint/draw logic
-    }
-
 
     update();
 }

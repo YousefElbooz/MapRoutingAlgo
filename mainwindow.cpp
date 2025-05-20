@@ -206,7 +206,7 @@ void MainWindow::setupUi()
 void MainWindow::loadMapFile()
 {
     timeInMap = 0;
-    QString filePath = QFileDialog::getOpenFileName(this, "Open Map File", "../", "Text Files (*.txt)");
+    QString filePath = QFileDialog::getOpenFileName(this, "Open Map File", "", "Text Files (*.txt)");
     if (filePath.isEmpty()) {
         return;
     }
@@ -237,7 +237,7 @@ void MainWindow::loadMapFile()
 void MainWindow::loadQueriesFile()
 {
     timeInQuery = 0;
-    QString filePath = QFileDialog::getOpenFileName(this, "Open Queries File", "../", "Text Files (*.txt)");
+    QString filePath = QFileDialog::getOpenFileName(this, "Open Queries File", "", "Text Files (*.txt)");
     if (filePath.isEmpty()) {
         return;
     }
@@ -360,7 +360,7 @@ void MainWindow::runAllQueries()
     auto endAll = std::chrono::high_resolution_clock::now();
     timeBase = std::chrono::duration_cast<std::chrono::milliseconds>(endAll - startAll).count();
 
-    saveResults("../Output/outputs.txt", results);
+    saveResults("Output/outputs.txt", results);
 
     // Format the results
     QString resultText;

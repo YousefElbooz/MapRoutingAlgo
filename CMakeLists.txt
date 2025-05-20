@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
+set(CMAKE_BUILD_TYPE Release)
+
 project(MapRoutingAlgo VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_AUTOUIC ON)

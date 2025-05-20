@@ -342,7 +342,7 @@ std::string MapGraph::displayOutput(const std::vector<PathResult> &results) cons
 
     std::stringstream result;
     std::string line;
-    int queryNumber = queries.size();
+    const unsigned long queryNumber = queries.size();
     bool hasMoreQueries = true;
 
     if (queryNumber == 0) {
@@ -351,7 +351,7 @@ std::string MapGraph::displayOutput(const std::vector<PathResult> &results) cons
     
     result << "\n===== SUMMARY STATISTICS =====\n";
     result << "Total queries processed: " << queryNumber << std::endl << std::endl;
-    for (int i = 0; i < queryNumber; i++) {
+    for (unsigned long i = 0; i < queryNumber; i++) {
         result << "-----------------\n";
         result << "Query #" << i+1 << ":\n" << results[i].resultText << std::endl;
     }
