@@ -184,8 +184,8 @@ PathResult MapGraph::findShortestPath(double startX, double startY, double endX,
     std::vector<bool> visitedEnd(nodePositions.size(), false);
 
     // Find closest nodes to start and end coordinates
-    std::vector<std::pair<int, double>> startNodes = findNodesWithinRadius(startX, startY, endX, endY, R, pqForward, timeForward, distForward);
-    std::vector<std::pair<int, double>> endNodes = findNodesWithinRadius(endX, endY, startX, startY, R, pqBackward, timeBackward, distBackward);
+    std::vector<std::pair<int, double>> startNodes = findNodesWithinRadius(startX, startY, R, pqForward, timeForward, distForward);
+    std::vector<std::pair<int, double>> endNodes = findNodesWithinRadius(endX, endY, R, pqBackward, timeBackward, distBackward);
 
     PathResult result;
     result.travelTime = std::numeric_limits<double>::infinity();
@@ -303,7 +303,7 @@ PathResult MapGraph::findShortestPath(double startX, double startY, double endX,
     result.totalDistance = distForward[meetingNode] + distBackward[meetingNode];
 
     // Calculate vehicle distance
-    result.vehicleDistance = result.totalDistance - result.walkingDistance;
+    result.vehicleDistance = round((result.totalDistance - result.walkingDistance)*100)/100;
 
     // Debug output
     std::cerr << "Path found with " << result.path.size() << " nodes:" << std::endl;
@@ -359,7 +359,7 @@ std::string MapGraph::displayOutput(const std::vector<PathResult> &results) cons
     return result.str();
 }
 
-std::vector<std::pair<int, double>> MapGraph::findNodesWithinRadius(double x, double y, double endx, double endy, double R,
+inline std::vector<std::pair<int, double>> MapGraph::findNodesWithinRadius(double x, double y, double R,
     priorityQueue& pq, std::vector<double>& time, std::vector<double>& dist) const {
     std::vector<std::pair<int, double>> result;
     for (int i = 0; i < nodePositions.size(); ++i) {

@@ -45,7 +45,7 @@ public:
     PathResult findShortestPath(double startX, double startY, double endX, double endY, double R);
     std::string displayOutput(const std::vector<PathResult> &results) const;
 
-    std::vector<std::pair<int, double>> findNodesWithinRadius(double x, double y, double endx, double endy, double R, std::priority_queue<std::pair<double, int>, std::vector<std::
+    std::vector<std::pair<int, double>> findNodesWithinRadius(double x, double y, double R, std::priority_queue<std::pair<double, int>, std::vector<std::
                                                               pair<double, int>>, std::greater<>> &pq, std::vector<double> &time, std::vector<double> &dist) const;
 
     std::vector<PathResult> runAllQueries();

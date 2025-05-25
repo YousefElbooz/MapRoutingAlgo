@@ -251,8 +251,6 @@ void MainWindow::loadQueriesFile()
         displayResult("Error loading queries file.");
         return;
     }
-    const auto endInQuery = std::chrono::high_resolution_clock::now();
-    timeInQuery = std::chrono::duration_cast<std::chrono::milliseconds>(endInQuery - startInQuery).count();
 
     queryList = mapGraph->getQueries();
 
@@ -265,6 +263,9 @@ void MainWindow::loadQueriesFile()
     Query query = queryList[currentQueryIndex];
     QString resultText = QString::fromStdString(mapGraph->findShortestPath(query.startX, query.startY, query.endX, query.endY, query.R).resultText);
     displayQuery(query, resultText);
+
+    const auto endInQuery = std::chrono::high_resolution_clock::now();
+    timeInQuery = std::chrono::duration_cast<std::chrono::milliseconds>(endInQuery - startInQuery).count();
 }
 
 void MainWindow::findShortestPath()
@@ -387,7 +388,7 @@ void MainWindow::enableSelection()
     qDebug() << "Selection mode is now " << (isSelectionEnabled ? "ON" : "OFF");
 }
 
-void MainWindow::displayQuery(const Query &query, QString resultText) const {
+void MainWindow::displayQuery(const Query &query, const QString& resultText) const {
     startXEdit->setText(QString::number(query.startX));
     startYEdit->setText(QString::number(query.startY));
     endXEdit->setText(QString::number(query.endX));

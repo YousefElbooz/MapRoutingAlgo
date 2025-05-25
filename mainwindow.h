@@ -77,6 +77,6 @@ private:
 
     void setupUi();
     void displayResult(const QString &result) const;
-    void displayQuery(const Query &query, QString resultText) const;
+    void displayQuery(const Query &query, const QString& resultText) const;
 };
 #endif // MAINWINDOW_H

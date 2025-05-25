@@ -2,7 +2,9 @@ cmake_minimum_required(VERSION 3.16)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
 
-project(MapRoutingAlgo VERSION 0.1 LANGUAGES CXX)
+project(MapRoutingApp VERSION 0.1 LANGUAGES CXX)
+
+set(CMAKE_BUILD_TYPE Release)
 
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
@@ -19,10 +21,11 @@ set(PROJECT_SOURCES
         mainwindow.cpp
         mainwindow.h
         mainwindow.ui
+        app.rc
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
-    qt_add_executable(MapRoutingAlgo
+    qt_add_executable(MapRoutingApp
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
         mapgraph.cpp
@@ -30,33 +33,33 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         mapgraph.h
         mapvisualizer.h
     )
-# Define target properties for Android with Qt 6 as:
-#    set_property(TARGET MapRoutingAlgo APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
-#                 ${CMAKE_CURRENT_SOURCE_DIR}/android)
-# For more information, see https://doc.qt.io/qt-6/qt-add-executable.html#target-creation
 else()
     if(ANDROID)
-        add_library(MapRoutingAlgo SHARED
+        add_library(MapRoutingApp SHARED
             ${PROJECT_SOURCES}
         )
-# Define properties for Android with Qt 5 after find_package() calls as:
-#    set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android")
     else()
-        add_executable(MapRoutingAlgo
+        add_executable(MapRoutingApp
             ${PROJECT_SOURCES}
         )
     endif()
 endif()
 
-target_link_libraries(MapRoutingAlgo PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
+target_link_libraries(MapRoutingApp PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
+
+# Set Windows-specific properties
+if(WIN32)
+    set_target_properties(MapRoutingApp PROPERTIES
+        WIN32_EXECUTABLE TRUE
+    )
+endif()
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
-# If you are developing for iOS or macOS you should consider setting an
-# explicit, fixed bundle identifier manually though.
 if(${QT_VERSION} VERSION_LESS 6.1.0)
-  set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.MapRoutingAlgo)
+  set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.MapRoutingApp)
 endif()
-set_target_properties(MapRoutingAlgo PROPERTIES
+
+set_target_properties(MapRoutingApp PROPERTIES
     ${BUNDLE_ID_OPTION}
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
@@ -65,12 +68,12 @@ set_target_properties(MapRoutingAlgo PROPERTIES
 )
 
 include(GNUInstallDirs)
-install(TARGETS MapRoutingAlgo
+install(TARGETS MapRoutingApp
     BUNDLE DESTINATION .
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
 if(QT_VERSION_MAJOR EQUAL 6)
-    qt_finalize_executable(MapRoutingAlgo)
+    qt_finalize_executable(MapRoutingApp)
 endif()
