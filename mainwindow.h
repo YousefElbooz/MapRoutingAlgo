@@ -3,7 +3,6 @@
 
 #include <QMainWindow>
 #include <QFileDialog>
-#include <QMessageBox>
 #include <QTextEdit>
 #include <QLabel>
 #include <QLineEdit>
@@ -19,13 +18,13 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
-class MainWindow : public QMainWindow
+class MainWindow final : public QMainWindow
 {
     Q_OBJECT
 
 public:
-    MainWindow(QWidget *parent = nullptr);
-    ~MainWindow();
+    explicit MainWindow(QWidget *parent = nullptr);
+    ~MainWindow() override;
 
 private slots:
     void loadMapFile();
@@ -44,33 +43,33 @@ public:
 private:
     Ui::MainWindow *ui;
     std::shared_ptr<MapGraph> mapGraph;
-    MapVisualizer *mapVisualizer;
+    MapVisualizer *mapVisualizer{};
     
-    QTextEdit *outputTextEdit;
-    QLabel *mapPathLabel;
-    QLabel *queriesPathLabel;
-    QLabel *outputPathLabel;
-    QLineEdit *REdit;
+    QTextEdit *outputTextEdit{};
+    QLabel *mapPathLabel{};
+    QLabel *queriesPathLabel{};
+    QLabel *outputPathLabel{};
+    QLineEdit *REdit{};
     
     QString mapFilePath;
     QString queriesFilePath;
     QString outputFilePath;
 
     //Queries/////////////---1---///////////////////
-    QLineEdit *queryLineEdit;
-    QLineEdit *startXEdit;
-    QLineEdit *startYEdit;
-    QLineEdit *endXEdit;
-    QLineEdit *endYEdit;
-    QLineEdit *queryIndexEdit;
+    QLineEdit *queryLineEdit{};
+    QLineEdit *startXEdit{};
+    QLineEdit *startYEdit{};
+    QLineEdit *endXEdit{};
+    QLineEdit *endYEdit{};
+    QLineEdit *queryIndexEdit{};
 
     std::vector<Query> queryList;  // Stores all queries from file
     int currentQueryIndex = 0;  // Tracks current query
 
-    long long timeInMap;
-    long long timeInQuery;
-    long long timeOut;
-    long long timeBase;
+    long long timeInMap{};
+    long long timeInQuery{};
+    long long timeOut{};
+    long long timeBase{};
 
     void setupUi();
     void displayResult(const QString &result) const;

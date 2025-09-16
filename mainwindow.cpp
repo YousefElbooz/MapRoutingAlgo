@@ -9,11 +9,11 @@
 #include <QGroupBox>
 #include <QPushButton>
 #include <QProgressDialog>
-#include <QtConcurrent/QtConcurrent>
+#include <QtConcurrent/QtConcurrentRun>
 #include <QFuture>
 #include <QFutureWatcher>
 #include <QApplication>
-#include <QResizeEvent>
+#include <QMessageBox>
 #include <atomic>
 
 bool MainWindow::isSelectionEnabled = false;
@@ -38,7 +38,7 @@ MainWindow::~MainWindow()
 void MainWindow::setupUi()
 {
     // Create main splitter
-    QSplitter *mainSplitter = new QSplitter(Qt::Horizontal, this);
+    auto *mainSplitter = new QSplitter(Qt::Horizontal, this);
     setCentralWidget(mainSplitter);
     
     // Create map visualizer widget

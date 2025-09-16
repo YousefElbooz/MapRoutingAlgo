@@ -3,10 +3,8 @@
 
 #include <QWidget>
 #include <QPainter>
-#include <QPaintEvent>
 #include <QMouseEvent>
 #include <QPoint>
-#include <vector>
 #include <memory>
 #include "mapgraph.h"
 
@@ -15,26 +13,26 @@ class MapVisualizer : public QWidget {
 
 public:
     explicit MapVisualizer(QWidget *parent = nullptr);
-    ~MapVisualizer();
+    ~MapVisualizer() override;
 
     void setMapGraph(const std::shared_ptr<MapGraph> &graph);
     void clearSelectionPoints();
     void reset();
     void resetZoom();
-    void clearOutput();
-    void resetUIState();
+
+    static void resetUIState();
 
     // Getters for selected points
-    QPointF getStartPoint() const { return startPoint; }
-    QPointF getEndPoint() const { return endPoint; }
+    [[nodiscard]] QPointF getStartPoint() const { return startPoint; }
+    [[nodiscard]] QPointF getEndPoint() const { return endPoint; }
     
     // Setters for points
     void setStartPoint(double x, double y) { startPoint = QPointF(x, y); update(); }
     void setEndPoint(double x, double y) { endPoint = QPointF(x, y); update(); }
     
     // Coordinate transformation
-    QPointF transformCoordinates(double x, double y) const;
-    QPointF inverseTransformCoordinates(int pixelX, int pixelY) const;
+    [[nodiscard]] QPointF transformCoordinates(double x, double y) const;
+    [[nodiscard]] QPointF inverseTransformCoordinates(int pixelX, int pixelY) const;
 
 signals:
     void startPointSelected(double x, double y);
@@ -73,6 +71,9 @@ private:
     // Coordinate transformation
     QRectF graphBounds;
     void calculateGraphBounds();
+
+    // Keep scaled content within view
+    void clampView();
 };
 
 #endif // MAPVISUALIZER_H 

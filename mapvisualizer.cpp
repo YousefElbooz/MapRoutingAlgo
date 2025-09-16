@@ -1,6 +1,5 @@
 #include "mapvisualizer.h"
 #include "mainwindow.h"
-#include <QDebug>
 
 MapVisualizer::MapVisualizer(QWidget *parent)
     : QWidget(parent),
@@ -49,11 +48,12 @@ void MapVisualizer::reset() {
 void MapVisualizer::resetZoom() {
     scaleFactor = 1.0;
     offset = QPointF(0, 0);
+    clampView();
     update();
 }
 
 void MapVisualizer::resetUIState() {
-    // No checkboxes or comboboxes in this class
+    // No checkboxes or combo-boxes in this class
     // You can clear internal state flags if needed
 }
 void MapGraph::clearLastPath() {
@@ -78,31 +78,30 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
         return;
     }
 
-    std::vector<std::pair<double, double>> nodes = mapGraph->getNodes();
+    const std::vector<std::pair<double, double>> nodes = mapGraph->getNodes();
     
     // Draw edges
     painter.setPen(QPen(edgeColor, 1/scaleFactor));
-    for (const auto& edge : mapGraph->getEdges()) {
-        const auto& source = nodes[edge.first];
-        const auto& dest = nodes[edge.second];
+    for (const auto&[edgeStart, edgeEnd] : mapGraph->getEdges()) {
+        const auto&[sourceX, sourceY] = nodes[edgeStart];
+        const auto&[destX, destY] = nodes[edgeEnd];
         
-        QPointF sourcePoint = transformCoordinates(source.first, source.second);
-        QPointF destPoint = transformCoordinates(dest.first, dest.second);
+        QPointF sourcePoint = transformCoordinates(sourceX, sourceY);
+        QPointF destPoint = transformCoordinates(destX, destY);
         
         painter.drawLine(sourcePoint, destPoint);
     }
     
-    //Draw shortest path if available
-    const auto& path = mapGraph->getLastPath();
-    if (!path.empty()) {
+    //Draw the shortest path if available
+    if (const auto& path = mapGraph->getLastPath(); !path.empty()) {
         painter.setPen(QPen(pathColor, pathThickness/scaleFactor));
         
         for (size_t i = 0; i < path.size() - 1; ++i) {
-            const auto& source = nodes[path[i]];
-            const auto& dest = nodes[path[i+1]];
+            const auto&[sourceX, sourceY] = nodes[path[i]];
+            const auto&[destX, destY] = nodes[path[i+1]];
             
-            QPointF sourcePoint = transformCoordinates(source.first, source.second);
-            QPointF destPoint = transformCoordinates(dest.first, dest.second);
+            QPointF sourcePoint = transformCoordinates(sourceX, sourceY);
+            QPointF destPoint = transformCoordinates(destX, destY);
             
             painter.drawLine(sourcePoint, destPoint);
         }
@@ -112,14 +111,14 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
     if (startPoint.x() != 0 || startPoint.y() != 0) {
         painter.setBrush(startPointColor);
         painter.setPen(QPen(Qt::black, 2/scaleFactor));
-        QPointF transformedStart = transformCoordinates(startPoint.x(), startPoint.y());
+        const QPointF transformedStart = transformCoordinates(startPoint.x(), startPoint.y());
         painter.drawEllipse(transformedStart, nodeDiameter/scaleFactor, nodeDiameter/scaleFactor);
     }
 
     if (endPoint.x() != 0 || endPoint.y() != 0) {
         painter.setBrush(endPointColor);
         painter.setPen(QPen(Qt::black, 2/scaleFactor));
-        QPointF transformedEnd = transformCoordinates(endPoint.x(), endPoint.y());
+        const QPointF transformedEnd = transformCoordinates(endPoint.x(), endPoint.y());
         painter.drawEllipse(transformedEnd, nodeDiameter/scaleFactor, nodeDiameter/scaleFactor);
     }
 
@@ -141,9 +140,10 @@ void MapVisualizer::mousePressEvent(QMouseEvent *event)
 void MapVisualizer::mouseMoveEvent(QMouseEvent *event)
 {
     if (!MainWindow::isSelectionEnabled && isPanning) {
-        QPoint delta = event->pos() - lastMousePos;
+        const QPoint delta = event->pos() - lastMousePos;
         offset += delta;
         lastMousePos = event->pos();
+        clampView();
         update();
     }
 }
@@ -154,7 +154,7 @@ void MapVisualizer::mouseReleaseEvent(QMouseEvent *event) {
     }
     
     if (MainWindow::isSelectionEnabled) {
-        QPointF clickPoint = inverseTransformCoordinates(event->pos().x(), event->pos().y());
+        const QPointF clickPoint = inverseTransformCoordinates(event->pos().x(), event->pos().y());
         
         if (!isStartPointSelected) {
             startPoint = clickPoint;
@@ -176,37 +176,37 @@ void MapVisualizer::mouseReleaseEvent(QMouseEvent *event) {
     update();
 }
 
-QPointF MapVisualizer::transformCoordinates(double x, double y) const {
+QPointF MapVisualizer::transformCoordinates(const double x, const double y) const {
     double width = this->width();
     double height = this->height();
     
     // Apply padding
-    double padding = 50;
+    constexpr double padding = 50;
     width -= 2 * padding;
     height -= 2 * padding;
     
-    // Scale coordinates to fit in widget
-    double scaleX = width / graphBounds.width();
-    double scaleY = height / graphBounds.height();
+    // Scale coordinates to fit in the widget
+    const double scaleX = width / graphBounds.width();
+    const double scaleY = height / graphBounds.height();
     
-    // Use the smaller scale to maintain aspect ratio
-    double scale = qMin(scaleX, scaleY);
+    // Use the smaller scale to maintain the aspect ratio
+    const double scale = qMin(scaleX, scaleY);
     
     // Calculate centered position
-    double scaledWidth = graphBounds.width() * scale;
-    double scaledHeight = graphBounds.height() * scale;
-    
-    double offsetX = padding + (width - scaledWidth) / 2;
-    double offsetY = padding + (height - scaledHeight) / 2;
+    const double scaledWidth = graphBounds.width() * scale;
+    const double scaledHeight = graphBounds.height() * scale;
+
+    const double offsetX = padding + (width - scaledWidth) / 2;
+    const double offsetY = padding + (height - scaledHeight) / 2;
     
     // Transform coordinates
     double pixelX = offsetX + (x - graphBounds.left()) * scale;
     double pixelY = offsetY + (graphBounds.height() - (y - graphBounds.top())) * scale;
     
-    return QPointF(pixelX, pixelY);
+    return {pixelX, pixelY};
 }
 
-QPointF MapVisualizer::inverseTransformCoordinates(int pixelX, int pixelY) const {
+QPointF MapVisualizer::inverseTransformCoordinates(const int pixelX, const int pixelY) const {
     // First, remove the offset to get coordinates relative to the original map position
     QPointF adjustedPoint = QPointF(pixelX, pixelY) - offset;
     
@@ -217,29 +217,29 @@ QPointF MapVisualizer::inverseTransformCoordinates(int pixelX, int pixelY) const
     double height = this->height();
     
     // Apply padding
-    double padding = 50;
+    constexpr double padding = 50;
     width -= 2 * padding;
     height -= 2 * padding;
     
-    // Scale coordinates to fit in widget
-    double scaleX = width / graphBounds.width();
-    double scaleY = height / graphBounds.height();
+    // Scale coordinates to fit in the widget
+    const double scaleX = width / graphBounds.width();
+    const double scaleY = height / graphBounds.height();
     
-    // Use the smaller scale to maintain aspect ratio
-    double scale = qMin(scaleX, scaleY);
+    // Use the smaller scale to maintain the aspect ratio
+    const double scale = qMin(scaleX, scaleY);
     
     // Calculate centered position
-    double scaledWidth = graphBounds.width() * scale;
-    double scaledHeight = graphBounds.height() * scale;
-    
-    double offsetX = padding + (width - scaledWidth) / 2;
-    double offsetY = padding + (height - scaledHeight) / 2;
+    const double scaledWidth = graphBounds.width() * scale;
+    const double scaledHeight = graphBounds.height() * scale;
+
+    const double offsetX = padding + (width - scaledWidth) / 2;
+    const double offsetY = padding + (height - scaledHeight) / 2;
     
     // Inverse transform
     double x = (adjustedPoint.x() - offsetX) / scale + graphBounds.left();
     double y = graphBounds.top() + graphBounds.height() - (adjustedPoint.y() - offsetY) / scale;
     
-    return QPointF(x, y);
+    return {x, y};
 }
 
 void MapVisualizer::calculateGraphBounds() {
@@ -253,16 +253,16 @@ void MapVisualizer::calculateGraphBounds() {
     double maxX = std::numeric_limits<double>::lowest();
     double maxY = std::numeric_limits<double>::lowest();
     
-    for (const auto& coords : mapGraph->getNodes()) {
-        minX = qMin(minX, coords.first);
-        minY = qMin(minY, coords.second);
-        maxX = qMax(maxX, coords.first);
-        maxY = qMax(maxY, coords.second);
+    for (const auto&[x, y] : mapGraph->getNodes()) {
+        minX = qMin(minX, x);
+        minY = qMin(minY, y);
+        maxX = qMax(maxX, x);
+        maxY = qMax(maxY, y);
     }
     
     // Add some padding
-    double paddingX = (maxX - minX) * 0.1;
-    double paddingY = (maxY - minY) * 0.1;
+    const double paddingX = (maxX - minX) * 0.1;
+    const double paddingY = (maxY - minY) * 0.1;
     
     graphBounds = QRectF(
         minX - paddingX,
@@ -273,18 +273,30 @@ void MapVisualizer::calculateGraphBounds() {
 }
 
 //Mouse Wheel Zooming function
-void MapVisualizer::wheelEvent(QWheelEvent *event)
-{
-    double factor = (event->angleDelta().y() > 0) ? 1.1 : 0.9;
+void MapVisualizer::wheelEvent(QWheelEvent *event) {
+    const double factor = (event->angleDelta().y() > 0) ? 1.1 : 0.9;
 
     // Optional: zoom centered around the cursor
-    QPointF cursorPos = event->position();
-    QPointF beforeScale = (cursorPos - offset) / scaleFactor;
+    const QPointF cursorPos = event->position();
+    const QPointF beforeScale = (cursorPos - offset) / scaleFactor;
 
-    scaleFactor *= factor;
+    double newScale = scaleFactor * factor;
+    if (newScale < 1.0) newScale = 1.0;
+    scaleFactor = newScale;
 
-    QPointF afterScale = beforeScale * scaleFactor;
+    const QPointF afterScale = beforeScale * scaleFactor;
     offset += (cursorPos - offset) - afterScale;
 
+    clampView();
     update();
+}
+
+void MapVisualizer::clampView() {
+    const double minX = static_cast<double>(width()) * (1.0 - scaleFactor);
+    const double minY = static_cast<double>(height()) * (1.0 - scaleFactor);
+
+    if (offset.x() < minX) offset.setX(minX);
+    if (offset.x() > 0.0) offset.setX(0.0);
+    if (offset.y() < minY) offset.setY(minY);
+    if (offset.y() > 0.0) offset.setY(0.0);
 }
