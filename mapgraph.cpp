@@ -174,14 +174,14 @@ PathResult MapGraph::findShortestPath(double startX, double startY, double endX,
     priorityQueue pqBackward;
 
     // Initialize arrays for Dijkstra's algorithm
-    std::vector<double> timeForward(nodePositions.size(), std::numeric_limits<double>::infinity());
-    std::vector<double> timeBackward(nodePositions.size(), std::numeric_limits<double>::infinity());
-    std::vector<double> distForward(nodePositions.size(), 0.0);
-    std::vector<double> distBackward(nodePositions.size(), 0.0);
-    std::vector<int> prevForward(nodePositions.size(), -1);
-    std::vector<int> prevBackward(nodePositions.size(), -1);
-    std::vector<bool> visitedStart(nodePositions.size(), false);
-    std::vector<bool> visitedEnd(nodePositions.size(), false);
+    std::vector timeForward(nodePositions.size(), std::numeric_limits<double>::infinity());
+    std::vector timeBackward(nodePositions.size(), std::numeric_limits<double>::infinity());
+    std::vector distForward(nodePositions.size(), 0.0);
+    std::vector distBackward(nodePositions.size(), 0.0);
+    std::vector prevForward(nodePositions.size(), -1);
+    std::vector prevBackward(nodePositions.size(), -1);
+    std::vector visitedStart(nodePositions.size(), false);
+    std::vector visitedEnd(nodePositions.size(), false);
 
     // Find closest nodes to start and end coordinates
     std::vector<std::pair<int, double>> startNodes = findNodesWithinRadius(startX, startY, R, pqForward, timeForward, distForward);
@@ -305,20 +305,6 @@ PathResult MapGraph::findShortestPath(double startX, double startY, double endX,
     // Calculate vehicle distance
     result.vehicleDistance = round((result.totalDistance - result.walkingDistance)*100)/100;
 
-    // Debug output
-    std::cerr << "Path found with " << result.path.size() << " nodes:" << std::endl;
-    for (size_t i = 0; i < result.path.size(); i++) {
-        std::cerr << result.path[i];
-        if (i < result.path.size() - 1) {
-            std::cerr << " -> ";
-        }
-    }
-    std::cerr << std::endl;
-    std::cerr << "Travel time: " << result.travelTime << " mins" << std::endl;
-    std::cerr << "Total Distance: " << result.totalDistance << " km" << std::endl;
-    std::cerr << "Walking distance: " << result.walkingDistance << " km" << std::endl;
-    std::cerr << "Vehicle Distance: " << result.vehicleDistance << " km" << std::endl;
-
     // Format result string
     std::stringstream ss;
     for (size_t i = 0; i < result.path.size(); i++) {
@@ -343,7 +329,6 @@ std::string MapGraph::displayOutput(const std::vector<PathResult> &results) cons
     std::stringstream result;
     std::string line;
     const unsigned long queryNumber = queries.size();
-    bool hasMoreQueries = true;
 
     if (queryNumber == 0) {
         return "No valid query results found in the output file.";
@@ -382,7 +367,6 @@ std::vector<PathResult> MapGraph::runAllQueries() {
     std::vector<PathResult> results;
     
     if (queries.empty()) {
-        std::cerr << "No queries loaded." << std::endl;
         return results;
     }
     
@@ -396,20 +380,7 @@ std::vector<PathResult> MapGraph::runAllQueries() {
             try {
                 // Compute the actual path by finding the shortest path
                 result = findShortestPath(query.startX, query.startY, query.endX, query.endY, query.R);
-
-                // Debug output
-                std::cerr << "Query #" << (i+1) << " result: " << std::endl;
-                std::cerr << "  Path: ";
-                for (const auto& node : result.path) {
-                    std::cerr << node << " ";
-                }
-                std::cerr << std::endl;
-                std::cerr << "  Travel time: " << result.travelTime << " mins" << std::endl;
-                std::cerr << "  Vehicle Distance: " << result.vehicleDistance << " km" << std::endl;
-                std::cerr << "  Walking distance: " << result.walkingDistance << " km" << std::endl;
-                
             } catch (const std::exception& e) {
-                std::cerr << "Exception processing query " << i << ": " << e.what() << std::endl;
                 result.resultText = "Error: Exception during path finding";
             }
             results.push_back(result);

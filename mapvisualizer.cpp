@@ -5,20 +5,20 @@
 MapVisualizer::MapVisualizer(QWidget *parent)
     : QWidget(parent),
       isStartPointSelected(false),
-      nodeDiameter(6),
-      pathThickness(2),
+      nodeDiameter(10),
+      pathThickness(3),
       nodeColor(Qt::blue),
       edgeColor(Qt::green),
       pathColor(Qt::red),
       selectedNodeColor(Qt::green),
       startPointColor(Qt::blue),
       endPointColor(Qt::magenta) {
-    
+
     setMinimumSize(400, 400);
     setMouseTracking(true);
 }
 
-MapVisualizer::~MapVisualizer() {}
+MapVisualizer::~MapVisualizer() = default;
 
 void MapVisualizer::setMapGraph(const std::shared_ptr<MapGraph> &graph) {
     mapGraph = graph;
@@ -45,21 +45,10 @@ void MapVisualizer::reset() {
     }
     // Reset zoom to default level
     resetZoom();
-    // Clear outputs
-    clearOutput();
-    // Reset UI elements to their default state
-    resetUIState();
-    update();
 }
 void MapVisualizer::resetZoom() {
     scaleFactor = 1.0;
     offset = QPointF(0, 0);
-    update();
-}
-
-void MapVisualizer::clearOutput() {
-    // No UI elements here, so just reset internal path/selection
-    //mapGraph->clearLastPath(); // Assuming you have this method
     update();
 }
 
@@ -92,7 +81,7 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
     std::vector<std::pair<double, double>> nodes = mapGraph->getNodes();
     
     // Draw edges
-    painter.setPen(QPen(edgeColor, 0.8));
+    painter.setPen(QPen(edgeColor, 1/scaleFactor));
     for (const auto& edge : mapGraph->getEdges()) {
         const auto& source = nodes[edge.first];
         const auto& dest = nodes[edge.second];
@@ -106,7 +95,7 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
     //Draw shortest path if available
     const auto& path = mapGraph->getLastPath();
     if (!path.empty()) {
-        painter.setPen(QPen(pathColor, pathThickness));
+        painter.setPen(QPen(pathColor, pathThickness/scaleFactor));
         
         for (size_t i = 0; i < path.size() - 1; ++i) {
             const auto& source = nodes[path[i]];
@@ -122,28 +111,16 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
     // Draw selected points
     if (startPoint.x() != 0 || startPoint.y() != 0) {
         painter.setBrush(startPointColor);
-        painter.setPen(Qt::black);
+        painter.setPen(QPen(Qt::black, 2/scaleFactor));
         QPointF transformedStart = transformCoordinates(startPoint.x(), startPoint.y());
-        painter.drawEllipse(transformedStart, nodeDiameter, nodeDiameter);
-        // Draw centered 'S' text
-        painter.setPen(Qt::white);
-        QFont font = painter.font();
-        font.setPointSize(nodeDiameter);
-        painter.setFont(font);
-        painter.drawText(transformedStart.x()-2, transformedStart.y()+3, "S");
+        painter.drawEllipse(transformedStart, nodeDiameter/scaleFactor, nodeDiameter/scaleFactor);
     }
-    
+
     if (endPoint.x() != 0 || endPoint.y() != 0) {
         painter.setBrush(endPointColor);
-        painter.setPen(Qt::black);
+        painter.setPen(QPen(Qt::black, 2/scaleFactor));
         QPointF transformedEnd = transformCoordinates(endPoint.x(), endPoint.y());
-        painter.drawEllipse(transformedEnd, nodeDiameter, nodeDiameter);
-        // Draw centered 'E' text
-        painter.setPen(Qt::white);
-        QFont font = painter.font();
-        font.setPointSize(nodeDiameter);
-        painter.setFont(font);
-        painter.drawText(transformedEnd.x()-2, transformedEnd.y()+3, "E");
+        painter.drawEllipse(transformedEnd, nodeDiameter/scaleFactor, nodeDiameter/scaleFactor);
     }
 
     painter.restore();  // Restore painter to original state

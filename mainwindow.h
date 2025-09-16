@@ -6,13 +6,10 @@
 #include <QMessageBox>
 #include <QTextEdit>
 #include <QLabel>
-#include <QPushButton>
 #include <QLineEdit>
-#include <QHBoxLayout>
-#include <QVBoxLayout>
-#include <QGroupBox>
 #include <QCompleter>
 #include <memory>
+#include <QThread>
 #include "mapgraph.h"
 #include "mapvisualizer.h"
 
@@ -78,5 +75,15 @@ private:
     void setupUi();
     void displayResult(const QString &result) const;
     void displayQuery(const Query &query, const QString& resultText) const;
+
+    // Loading overlay helpers
+    void showLoading(const QString &message);
+    void hideLoading();
+    QWidget *loadingOverlay = nullptr;
+    QLabel *loadingLabel = nullptr;
+
+protected:
+    void resizeEvent(QResizeEvent *event) override;
 };
+
 #endif // MAINWINDOW_H

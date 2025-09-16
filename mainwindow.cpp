@@ -2,11 +2,19 @@
 #include "ui_mainwindow.h"
 #include <QSplitter>
 #include <QScrollBar>
-#include <QRegularExpression>
 #include <iostream>
 #include <chrono>
 #include <fstream>
-
+#include <QVBoxLayout>
+#include <QGroupBox>
+#include <QPushButton>
+#include <QProgressDialog>
+#include <QtConcurrent/QtConcurrent>
+#include <QFuture>
+#include <QFutureWatcher>
+#include <QApplication>
+#include <QResizeEvent>
+#include <atomic>
 
 bool MainWindow::isSelectionEnabled = false;
 
@@ -112,7 +120,7 @@ void MainWindow::setupUi()
 
     // Connect navigation
     connect(btnPrevQuery, &QPushButton::clicked, this, [=]() {
-        if (currentQueryIndex > 0) {
+        if (currentQueryIndex > 0 && !queryList.empty()) {
             currentQueryIndex--;
             Query query = queryList[currentQueryIndex];
             QString resultText = QString::fromStdString(mapGraph->findShortestPath(query.startX, query.startY, query.endX, query.endY, query.R).resultText);
@@ -121,7 +129,7 @@ void MainWindow::setupUi()
     });
 
     connect(btnNextQuery, &QPushButton::clicked, this, [=]() {
-        if (currentQueryIndex < queryList.size() - 1) {
+        if (currentQueryIndex < queryList.size() - 1 && !queryList.empty()) {
             currentQueryIndex++;
             Query query = queryList[currentQueryIndex];
             QString resultText = QString::fromStdString(mapGraph->findShortestPath(query.startX, query.startY, query.endX, query.endY, query.R).resultText);
@@ -213,6 +221,8 @@ void MainWindow::loadMapFile()
     mapFilePath = filePath;
     mapPathLabel->setText(mapFilePath);
 
+    showLoading("Loading map... Please wait");
+
     const auto startInMap = std::chrono::high_resolution_clock::now();
     if (mapGraph->loadMapFromFile(mapFilePath.toStdString())) {
         mapVisualizer->setMapGraph(mapGraph);
@@ -228,10 +238,12 @@ void MainWindow::loadMapFile()
         displayResult("Map file loaded successfully.");
     } else {
         displayResult("Error loading map file.");
+        hideLoading();
         return;
     }
     const auto endInMap = std::chrono::high_resolution_clock::now();
     timeInMap = std::chrono::duration_cast<std::chrono::milliseconds>(endInMap - startInMap).count();
+    hideLoading();
 }
 
 void MainWindow::loadQueriesFile()
@@ -351,28 +363,74 @@ void MainWindow::runAllQueries()
         return;
     }
     timeBase = 0;
-    // Start timer for all queries
-    auto startAll = std::chrono::high_resolution_clock::now();
-    
-    // Run all queries
-    std::vector<PathResult> results = mapGraph->runAllQueries();
-    
-    // End timer for all queries
-    auto endAll = std::chrono::high_resolution_clock::now();
-    timeBase = std::chrono::duration_cast<std::chrono::milliseconds>(endAll - startAll).count();
 
-    saveResults("Output/outputs.txt", results);
+    if (queryList.empty()) {
+        displayResult("No queries to run.");
+        return;
+    }
 
-    // Format the results
-    QString resultText;
-    resultText += "Executed " + QString::number(results.size()) + " queries in " + 
-                  QString::number(timeBase) + " ms\nExecution time + I/O: " +
-                  QString::number(timeInMap + timeInQuery + timeBase + timeOut) + " ms\n\n";
-    resultText += QString::fromStdString(mapGraph->displayOutput(results));
-    
-    // Display results and update visualization
-    currentQueryIndex = queryList.size() - 1;
-    displayQuery(queryList[currentQueryIndex], resultText);
+    QProgressDialog progressDialog("Processing queries...", "Cancel", 0, static_cast<int>(queryList.size()), this);
+    progressDialog.setStyleSheet(
+        "QProgressBar {"
+        "  border: 1px solid #555; border-radius: 4px;"
+        "  background: #2a2a2a; color: #eee;"
+        "  text-align: center;"
+        "}"
+        "QProgressBar::chunk {"
+        "  background-color: #00a755;"
+        "}"
+    );
+    progressDialog.setCancelButton(nullptr);
+    progressDialog.setWindowModality(Qt::ApplicationModal);
+    progressDialog.setMinimumDuration(0);
+    progressDialog.setValue(0);
+
+    std::atomic_bool cancel{false};
+    QObject::connect(&progressDialog, &QProgressDialog::canceled, [&]{ cancel = true; });
+
+    auto future = QtConcurrent::run([this, &cancel, &progressDialog]() {
+        std::vector<PathResult> localResults;
+        localResults.reserve(queryList.size());
+        auto startAll = std::chrono::high_resolution_clock::now();
+        for (size_t i = 0; i < queryList.size(); ++i) {
+            if (cancel.load()) break;
+            const auto &q = queryList[i];
+            localResults.push_back(mapGraph->findShortestPath(q.startX, q.startY, q.endX, q.endY, q.R));
+            QMetaObject::invokeMethod(&progressDialog, [this, &progressDialog, i]() {
+                progressDialog.setRange(0, static_cast<int>(queryList.size()));
+                progressDialog.setValue(static_cast<int>(i + 1));
+                progressDialog.setLabelText(QString("Processing %1 / %2 ...").arg(static_cast<int>(i + 1)).arg(static_cast<int>(queryList.size())));
+            }, Qt::QueuedConnection);
+        }
+        auto endAll = std::chrono::high_resolution_clock::now();
+        long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(endAll - startAll).count();
+        return std::make_pair(elapsed, std::move(localResults));
+    });
+
+    QFutureWatcher<std::pair<long long, std::vector<PathResult>>> watcher;
+    QObject::connect(&watcher, &QFutureWatcherBase::progressValueChanged, &progressDialog, &QProgressDialog::setValue);
+    QObject::connect(&watcher, &QFutureWatcherBase::progressRangeChanged, &progressDialog, &QProgressDialog::setRange);
+    QObject::connect(&watcher, &QFutureWatcherBase::finished, this, [this, &progressDialog, &watcher]() {
+        auto pair = watcher.result();
+        timeBase = pair.first;
+        auto results = std::move(pair.second);
+
+        saveResults("Output/outputs.txt", results);
+
+        QString resultText;
+        resultText += "Executed " + QString::number(results.size()) + " queries in " + 
+                      QString::number(timeBase) + " ms\nExecution time + I/O: " +
+                      QString::number(timeInMap + timeInQuery + timeBase + timeOut) + " ms\n\n";
+        resultText += QString::fromStdString(mapGraph->displayOutput(results));
+        
+        currentQueryIndex = queryList.size() - 1;
+        displayQuery(queryList[currentQueryIndex], resultText);
+
+        progressDialog.close();
+    });
+
+    watcher.setFuture(future);
+    progressDialog.exec();
 }
 
 void MainWindow::displayResult(const QString &result) const {
@@ -415,3 +473,44 @@ void MainWindow::handleResetAll() {
 
     currentQueryIndex = 0;
 }
+
+void MainWindow::showLoading(const QString &message)
+{
+    if (!loadingOverlay) {
+        loadingOverlay = new QWidget(this);
+        loadingOverlay->setAttribute(Qt::WA_TransparentForMouseEvents, false);
+        loadingOverlay->setStyleSheet("background-color: rgba(0, 0, 0, 128);");
+        loadingOverlay->setGeometry(rect());
+        loadingOverlay->raise();
+
+        loadingLabel = new QLabel(loadingOverlay);
+        loadingLabel->setStyleSheet("color: white; font-size: 18px; background: rgba(0,0,0,0);");
+        loadingLabel->setAlignment(Qt::AlignCenter);
+        loadingLabel->setWordWrap(true);
+        loadingLabel->setText(message);
+        loadingLabel->setGeometry(0, 0, loadingOverlay->width(), loadingOverlay->height());
+    } else {
+        loadingLabel->setText(message);
+        loadingOverlay->setGeometry(rect());
+        loadingLabel->setGeometry(0, 0, loadingOverlay->width(), loadingOverlay->height());
+    }
+
+    loadingOverlay->show();
+    QApplication::processEvents();
+}
+
+void MainWindow::hideLoading()
+{
+    if (loadingOverlay) loadingOverlay->hide();
+}
+
+void MainWindow::resizeEvent(QResizeEvent *event)
+{
+    QMainWindow::resizeEvent(event);
+    if (loadingOverlay && loadingLabel && loadingOverlay->isVisible()) {
+        loadingOverlay->setGeometry(rect());
+        loadingLabel->setGeometry(0, 0, loadingOverlay->width(), loadingOverlay->height());
+    }
+}
+
+
