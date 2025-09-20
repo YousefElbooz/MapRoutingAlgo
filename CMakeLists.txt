@@ -75,6 +75,88 @@ install(TARGETS MapRoutingApp
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
+# Install additional files
+install(FILES "${CMAKE_SOURCE_DIR}/README.md" DESTINATION . OPTIONAL)
+install(FILES "${CMAKE_SOURCE_DIR}/icon.ico" DESTINATION . OPTIONAL)
+install(DIRECTORY "${CMAKE_SOURCE_DIR}/styles" DESTINATION . OPTIONAL)
+
+# Install Qt DLLs for Windows
+if(WIN32)
+    # Install Qt platform plugins
+    install(DIRECTORY "${CMAKE_SOURCE_DIR}/platforms" DESTINATION . OPTIONAL)
+    install(DIRECTORY "${CMAKE_SOURCE_DIR}/imageformats" DESTINATION . OPTIONAL)
+    install(DIRECTORY "${CMAKE_SOURCE_DIR}/iconengines" DESTINATION . OPTIONAL)
+    install(DIRECTORY "${CMAKE_SOURCE_DIR}/generic" DESTINATION . OPTIONAL)
+    install(DIRECTORY "${CMAKE_SOURCE_DIR}/networkinformation" DESTINATION . OPTIONAL)
+    install(DIRECTORY "${CMAKE_SOURCE_DIR}/tls" DESTINATION . OPTIONAL)
+    install(DIRECTORY "${CMAKE_SOURCE_DIR}/translations" DESTINATION . OPTIONAL)
+endif()
+
+# Set install prefix to avoid permission issues
+if(WIN32)
+    set(CMAKE_INSTALL_PREFIX "${CMAKE_SOURCE_DIR}/install" CACHE PATH "Installation Directory" FORCE)
+endif()
+
+# Deploy Qt dependencies on Windows
+if(WIN32 AND CMAKE_BUILD_TYPE STREQUAL "Release")
+    # Find windeployqt
+    get_target_property(QT_QMAKE_EXECUTABLE Qt${QT_VERSION_MAJOR}::qmake IMPORTED_LOCATION)
+    if(QT_QMAKE_EXECUTABLE)
+        get_filename_component(QT_WINDEPLOYQT_EXECUTABLE ${QT_QMAKE_EXECUTABLE} PATH)
+        set(QT_WINDEPLOYQT_EXECUTABLE "${QT_WINDEPLOYQT_EXECUTABLE}/windeployqt.exe")
+        
+        if(EXISTS ${QT_WINDEPLOYQT_EXECUTABLE})
+            # Deploy Qt libraries during build
+            add_custom_command(TARGET MapRoutingApp POST_BUILD
+                COMMAND ${QT_WINDEPLOYQT_EXECUTABLE} --verbose 0 --no-translations --no-system-d3d-compiler --no-opengl-sw $<TARGET_FILE:MapRoutingApp>
+                COMMENT "Deploying Qt libraries")
+        endif()
+    endif()
+endif()
+
 if(QT_VERSION_MAJOR EQUAL 6)
     qt_finalize_executable(MapRoutingApp)
+endif()
+
+# ==================== CPACK CONFIGURATION ====================
+
+# Include CPack
+include(CPack)
+
+# Basic package information
+set(CPACK_PACKAGE_NAME "MapRoutingApp")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Map Routing Application - Find optimal routes on maps")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
+set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "MapRoutingApp")
+
+# Set the license file if you have one
+# set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
+
+# Set the readme file
+set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_SOURCE_DIR}/README.md")
+
+# Package file name
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}")
+
+# Windows-specific settings
+if(WIN32)
+    # Available generators: NSIS, ZIP, 7Z
+    set(CPACK_GENERATOR "NSIS;ZIP")
+    
+    # NSIS specific settings
+    set(CPACK_NSIS_DISPLAY_NAME "Map Routing App")
+    set(CPACK_NSIS_PACKAGE_NAME "MapRoutingApp")
+    set(CPACK_NSIS_MODIFY_PATH ON)
+endif()
+
+# Linux-specific settings
+if(UNIX AND NOT APPLE)
+    set(CPACK_GENERATOR "DEB;RPM;TGZ")
+endif()
+
+# macOS-specific settings
+if(APPLE)
+    set(CPACK_GENERATOR "DragNDrop;TGZ")
 endif()

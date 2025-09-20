@@ -29,11 +29,13 @@ public:
 private slots:
     void loadMapFile();
     void loadQueriesFile();
-    void findShortestPath();
-    void onPointsSelected(double startX, double startY, double endX, double endY);
+    void findShortestPath() const;
+    void onPointsSelected(double startX, double startY, double endX, double endY) const;
     void saveResults(const std::string& filename, const std::vector<PathResult>& results);
     void runAllQueries();
     void handleResetAll();
+    void toggleTheme();
+    void updateTheme();
 
     static void enableSelection();
 
@@ -50,6 +52,7 @@ private:
     QLabel *queriesPathLabel{};
     QLabel *outputPathLabel{};
     QLineEdit *REdit{};
+    QPushButton *themeToggleButton{};
     
     QString mapFilePath;
     QString queriesFilePath;
@@ -64,7 +67,7 @@ private:
     QLineEdit *queryIndexEdit{};
 
     std::vector<Query> queryList;  // Stores all queries from file
-    int currentQueryIndex = 0;  // Tracks current query
+    unsigned long long currentQueryIndex = 0;  // Tracks current query
 
     long long timeInMap{};
     long long timeInQuery{};
@@ -77,7 +80,7 @@ private:
 
     // Loading overlay helpers
     void showLoading(const QString &message);
-    void hideLoading();
+    void hideLoading() const;
     QWidget *loadingOverlay = nullptr;
     QLabel *loadingLabel = nullptr;
 

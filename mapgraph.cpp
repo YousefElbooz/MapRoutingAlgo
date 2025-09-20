@@ -6,12 +6,13 @@
 #include <fstream>
 #include <iostream>
 #include <cmath>
+#include <sstream>
 
-MapGraph::MapGraph() {}
+MapGraph::MapGraph() = default;
 
-MapGraph::~MapGraph() {}
+MapGraph::~MapGraph() = default;
 
-bool MapGraph::empty() {
+bool MapGraph::empty() const {
     return adjacencyList.empty();
 }
 
@@ -28,7 +29,7 @@ bool MapGraph::loadMapFromFile(const std::string& filename) {
         edges.clear();
         adjacencyList.clear();
     
-        // Read number of nodes
+        // Read the number of nodes
         int numNodes;
         file >> numNodes;
         
@@ -42,7 +43,7 @@ bool MapGraph::loadMapFromFile(const std::string& filename) {
 
         // Read node information
         for (int i = 0; i < numNodes; i++) {
-            Node node;
+            Node node{};
             file >> node.id >> node.x >> node.y;
             
             // Check for invalid node data
@@ -51,11 +52,11 @@ bool MapGraph::loadMapFromFile(const std::string& filename) {
                 return false;
             }
             
-            // Create spatial index for faster lookups
+            // Create the spatial index for faster lookups
             nodePositions.emplace_back(node.x, node.y);
         }
         
-        // Read number of edges
+        // Read the number of edges
         int numEdges;
         file >> numEdges;
 
@@ -67,14 +68,14 @@ bool MapGraph::loadMapFromFile(const std::string& filename) {
         // Reserve capacity
         edges.reserve(numEdges);
 
-        // Initialize adjacency list
+        // Initialize the adjacency list
         adjacencyList.resize(numNodes);
 
         max_speed = 0;
         // Read edge information
         for (int i = 0; i < numEdges; i++) {
             int source, destination;
-            Edge edge;
+            Edge edge{};
             file >> source >> destination >> edge.distance >> edge.speed;
 
             max_speed = qMax(max_speed, edge.speed);
@@ -85,17 +86,7 @@ bool MapGraph::loadMapFromFile(const std::string& filename) {
                 return false;
             }
 
-            // Validate edge data
-            // if (edge.source < 0 || edge.source >= numNodes ||
-            //     edge.destination < 0 || edge.destination >= numNodes ||
-            //     edge.distance < 0 || edge.speed <= 0) {
-            //     std::cerr << "Invalid edge data at index " << i << ": "
-            //               << source << " " << destination << " "
-            //               << distance << std::endl;
-            //     continue; // Skip invalid edge
-            // }
-
-            edges.push_back({source,destination});
+            edges.emplace_back(source,destination);
 
             // Update adjacency list
             adjacencyList[source].push_back({destination, {edge.distance, edge.speed}});
@@ -125,7 +116,7 @@ bool MapGraph::loadQueriesFromFile(const std::string& filename) {
         // Clear previous queries
         queries.clear();
         
-        // Read number of queries
+        // Read the number of queries
         int numQueries;
         file >> numQueries;
         
@@ -139,7 +130,7 @@ bool MapGraph::loadQueriesFromFile(const std::string& filename) {
         
         // Read query information
         for (int i = 0; i < numQueries; i++) {
-            Query q;
+            Query q{};
             file >> q.startX >> q.startY >> q.endX >> q.endY >> q.R;
             q.R/=1000; // Convert to km
 
@@ -183,7 +174,7 @@ PathResult MapGraph::findShortestPath(double startX, double startY, double endX,
     std::vector visitedStart(nodePositions.size(), false);
     std::vector visitedEnd(nodePositions.size(), false);
 
-    // Find closest nodes to start and end coordinates
+    // Find the closest nodes to start and end coordinates
     std::vector<std::pair<int, double>> startNodes = findNodesWithinRadius(startX, startY, R, pqForward, timeForward, distForward);
     std::vector<std::pair<int, double>> endNodes = findNodesWithinRadius(endX, endY, R, pqBackward, timeBackward, distBackward);
 
@@ -209,8 +200,7 @@ PathResult MapGraph::findShortestPath(double startX, double startY, double endX,
 
             // Check if this node has been visited by backward search
             if (visitedEnd[currNode]) {
-                double totalTime = timeForward[currNode] + timeBackward[currNode];
-                if (totalTime < result.travelTime) {
+                if (double totalTime = timeForward[currNode] + timeBackward[currNode]; totalTime < result.travelTime) {
                     meetingNode = currNode;
                     result.travelTime = totalTime;
                 }
@@ -244,8 +234,7 @@ PathResult MapGraph::findShortestPath(double startX, double startY, double endX,
 
             // Check if this node has been visited by forward search
             if (visitedStart[currNode]) {
-                double totalTime = timeForward[currNode] + timeBackward[currNode];
-                if (totalTime < result.travelTime) {
+                if (double totalTime = timeForward[currNode] + timeBackward[currNode]; totalTime < result.travelTime) {
                     meetingNode = currNode;
                     result.travelTime = totalTime;
                 }
@@ -286,7 +275,7 @@ PathResult MapGraph::findShortestPath(double startX, double startY, double endX,
     }
     std::reverse(forwardPath.begin(), forwardPath.end());
 
-    // Reconstruct backward path
+    // Reconstruct the backward path
     std::vector<int> backwardPath;
     for (int at = prevBackward[meetingNode]; at != -1; at = prevBackward[at]) {
         backwardPath.push_back(at);
@@ -344,12 +333,11 @@ std::string MapGraph::displayOutput(const std::vector<PathResult> &results) cons
     return result.str();
 }
 
-inline std::vector<std::pair<int, double>> MapGraph::findNodesWithinRadius(double x, double y, double R,
+inline std::vector<std::pair<int, double>> MapGraph::findNodesWithinRadius(const double x, const double y, const double R,
     priorityQueue& pq, std::vector<double>& time, std::vector<double>& dist) const {
     std::vector<std::pair<int, double>> result;
     for (int i = 0; i < nodePositions.size(); ++i) {
-        double distance = calculateDistance(x, y, nodePositions[i].first, nodePositions[i].second);
-        if (distance <= R) {
+        if (double distance = calculateDistance(x, y, nodePositions[i].first, nodePositions[i].second); distance <= R) {
             time[i] = (distance / 5.0) * 60.0;
             dist[i] = distance;
             pq.emplace(time[i], i);
@@ -359,7 +347,7 @@ inline std::vector<std::pair<int, double>> MapGraph::findNodesWithinRadius(doubl
     return result;
 }
 
-double MapGraph::calculateDistance(double x1, double y1, double x2, double y2) {
+double MapGraph::calculateDistance(const double x1, const double y1, const double x2, const double y2) {
     return std::sqrt(std::pow(x2 - x1, 2) + std::pow(y2 - y1, 2));
 }
 
@@ -373,14 +361,12 @@ std::vector<PathResult> MapGraph::runAllQueries() {
     try {
         results.reserve(queries.size()); // Preallocate to avoid reallocations
         
-        for (size_t i = 0; i < queries.size(); i++) {
-            const auto& query = queries[i];
-            
+        for (auto [startX, startY, endX, endY, R] : queries) {
             PathResult result;
             try {
                 // Compute the actual path by finding the shortest path
-                result = findShortestPath(query.startX, query.startY, query.endX, query.endY, query.R);
-            } catch (const std::exception& e) {
+                result = findShortestPath(startX, startY, endX, endY, R);
+            } catch ([[maybe_unused]] const std::exception& e) {
                 result.resultText = "Error: Exception during path finding";
             }
             results.push_back(result);

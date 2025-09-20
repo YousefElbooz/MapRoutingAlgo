@@ -7,7 +7,6 @@
 #include <fstream>
 #include <QVBoxLayout>
 #include <QGroupBox>
-#include <QPushButton>
 #include <QProgressDialog>
 #include <QtConcurrent/QtConcurrentRun>
 #include <QFuture>
@@ -15,6 +14,8 @@
 #include <QApplication>
 #include <QMessageBox>
 #include <atomic>
+#include <QPushButton>
+#include <QStyle>
 
 bool MainWindow::isSelectionEnabled = false;
 
@@ -25,7 +26,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     setupUi();
-    
+    updateTheme();
     setWindowTitle("Map Routing Visualizer");
     resize(1200, 800);
 }
@@ -37,7 +38,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::setupUi()
 {
-    // Create main splitter
+    // Create the main splitter
     auto *mainSplitter = new QSplitter(Qt::Horizontal, this);
     setCentralWidget(mainSplitter);
     
@@ -46,46 +47,46 @@ void MainWindow::setupUi()
     mapVisualizer->setMapGraph(mapGraph);
 
     // Create controls panel
-    QWidget *controlPanel = new QWidget(this);
-    QVBoxLayout *controlLayout = new QVBoxLayout(controlPanel);
-    
+    auto *controlPanel = new QWidget(this);
+    auto *controlLayout = new QVBoxLayout(controlPanel);
+
     // File selection group
-    QGroupBox *fileGroup = new QGroupBox("Input/Output Files", controlPanel);
-    QVBoxLayout *fileLayout = new QVBoxLayout(fileGroup);
-    
+    auto *fileGroup = new QGroupBox("Input/Output Files", controlPanel);
+    auto *fileLayout = new QVBoxLayout(fileGroup);
+
     // Map file selection
-    QHBoxLayout *mapFileLayout = new QHBoxLayout();
+    auto *mapFileLayout = new QHBoxLayout();
     mapPathLabel = new QLabel("No map file selected", fileGroup);
     mapPathLabel->setWordWrap(true);
-    QPushButton *mapFileButton = new QPushButton("Select Map", fileGroup);
+    auto *mapFileButton = new QPushButton("Select Map", fileGroup);
     connect(mapFileButton, &QPushButton::clicked, this, &MainWindow::loadMapFile);
     mapFileLayout->addWidget(mapPathLabel);
     mapFileLayout->addWidget(mapFileButton);
     fileLayout->addLayout(mapFileLayout);
-    
+
     // Queries file selection
-    QHBoxLayout *queriesFileLayout = new QHBoxLayout();
+    auto *queriesFileLayout = new QHBoxLayout();
     queriesPathLabel = new QLabel("No queries file selected", fileGroup);
     queriesPathLabel->setWordWrap(true);
-    QPushButton *queriesFileButton = new QPushButton("Select Queries", fileGroup);
+    auto *queriesFileButton = new QPushButton("Select Queries", fileGroup);
     connect(queriesFileButton, &QPushButton::clicked, this, &MainWindow::loadQueriesFile);
     queriesFileLayout->addWidget(queriesPathLabel);
     queriesFileLayout->addWidget(queriesFileButton);
     fileLayout->addLayout(queriesFileLayout);
-    
+
     // Run all queries button
-    QPushButton *runAllQueriesButton = new QPushButton("Run All Queries", fileGroup);
+    auto *runAllQueriesButton = new QPushButton("Run All Queries", fileGroup);
     connect(runAllQueriesButton, &QPushButton::clicked, this, &MainWindow::runAllQueries);
     fileLayout->addWidget(runAllQueriesButton);
-    
+
     controlLayout->addWidget(fileGroup);
 
     // ======= New Query Navigation UI with Coordinate Fields =======
-    QGroupBox *queryNavGroup = new QGroupBox("Query Navigation", controlPanel);
-    QVBoxLayout *queryNavLayout = new QVBoxLayout(queryNavGroup);
+    auto *queryNavGroup = new QGroupBox("Query Navigation", controlPanel);
+    auto *queryNavLayout = new QVBoxLayout(queryNavGroup);
 
     // Coordinate inputs
-    QHBoxLayout *coordsLayout = new QHBoxLayout();
+    auto *coordsLayout = new QHBoxLayout();
     startXEdit = new QLineEdit();
     startXEdit->setPlaceholderText("Start X");
     startYEdit = new QLineEdit();
@@ -103,12 +104,12 @@ void MainWindow::setupUi()
     queryNavLayout->addLayout(coordsLayout);
 
     // Navigation buttons
-    QHBoxLayout *navButtonsLayout = new QHBoxLayout();
-    QPushButton *btnPrevQuery = new QPushButton("<-- Prev Query", queryNavGroup);
+    auto *navButtonsLayout = new QHBoxLayout();
+    auto *btnPrevQuery = new QPushButton("<-- Prev Query", queryNavGroup);
     queryIndexEdit = new QLineEdit(queryNavGroup);
     queryIndexEdit->setAlignment(Qt::AlignCenter);
     queryIndexEdit->setPlaceholderText("Query Number");
-    QPushButton *btnNextQuery = new QPushButton("Next Query -->", queryNavGroup);
+    auto *btnNextQuery = new QPushButton("Next Query -->", queryNavGroup);
 
 
     navButtonsLayout->addWidget(btnPrevQuery);
@@ -152,54 +153,119 @@ void MainWindow::setupUi()
     });
 
     // Adding select start/end button/////////////////////////////////////////////////////////////////
-    QPushButton *enable_SE_Button = new QPushButton("Enable Start/End Selection", fileGroup);
+    auto *enable_SE_Button = new QPushButton("Enable Start/End Selection", fileGroup);
     enable_SE_Button->setStyleSheet("background-color: green; color: white;");
     enable_SE_Button->setCheckable(true);  // make it toggle
     enable_SE_Button->setChecked(true);   // default: off
+    enable_SE_Button->setStyleSheet(QString(
+        "QPushButton {"
+        "  background-color: #00aa00 !important;"
+        "  color: white !important;"
+        "  border: 1px solid #00aa00 !important;"
+        "  padding: 4px 12px;"
+        "  border-radius: 4px;"
+        "}"
+        "QPushButton:hover {"
+        "  background-color: #006600 !important;"
+        "  border-color: #006600 !important;"
+        "}"
+        "QPushButton:pressed {"
+        "  background-color: #004d00 !important;"
+        "  border-color: #004d00 !important;"
+        "}"
+    ));
     fileLayout->addWidget(enable_SE_Button);
-    connect(enable_SE_Button, &QPushButton::toggled, this, [=](bool checked) {
+    connect(enable_SE_Button, &QPushButton::toggled, this, [=](const bool checked) {
         isSelectionEnabled = checked;
         enableSelection();
-        enable_SE_Button->setStyleSheet(QString("background-color: %1; color: white;").arg(isSelectionEnabled ? "red" : "green"));
+        QString color = isSelectionEnabled ? "red" : "#00aa00";
+        QString hoverColor = isSelectionEnabled ? "#cc0000" : "#006600"; // darker shade for hover
+        QString pressedColor = isSelectionEnabled ? "#990000" : "#004d00"; // even darker for pressed
+
+        enable_SE_Button->setStyleSheet(QString(
+            "QPushButton {"
+            "  background-color: %1 !important;"
+            "  color: white !important;"
+            "  border: 1px solid %1 !important;"
+            "  padding: 4px 12px;"
+            "  border-radius: 4px;"
+            "}"
+            "QPushButton:hover {"
+            "  background-color: %2 !important;"
+            "  border-color: %2 !important;"
+            "}"
+            "QPushButton:pressed {"
+            "  background-color: %3 !important;"
+            "  border-color: %3 !important;"
+            "}"
+        ).arg(color, hoverColor, pressedColor));
         enable_SE_Button->setText((isSelectionEnabled ? "Disable Start/End Selection" : "Enable Start/End Selection"));
     });
 
 
     // Path finding group
-    QGroupBox *pathGroup = new QGroupBox("Path Finding", controlPanel);
-    QVBoxLayout *pathLayout = new QVBoxLayout(pathGroup);
-    
-    QHBoxLayout *RLayout = new QHBoxLayout();
-    QLabel *RLabel = new QLabel("Max Walking Distance (km):", pathGroup);
+    auto *pathGroup = new QGroupBox("Path Finding", controlPanel);
+    auto *pathLayout = new QVBoxLayout(pathGroup);
+
+    auto *RLayout = new QHBoxLayout();
+    auto *RLabel = new QLabel("Max Walking Distance (km):", pathGroup);
     REdit = new QLineEdit(pathGroup);
     REdit->setText("10000");
     RLayout->addWidget(RLabel);
     RLayout->addWidget(REdit);
     pathLayout->addLayout(RLayout);
-    
-    QLabel *instructionLabel = new QLabel("Click on map to select start and end points", pathGroup);
+
+    auto *instructionLabel = new QLabel("Click on map to select start and end points", pathGroup);
     pathLayout->addWidget(instructionLabel);
-    
-    QPushButton *findPathButton = new QPushButton("Find Shortest Path", pathGroup);
+
+    auto *findPathButton = new QPushButton("Find Shortest Path", pathGroup);
     connect(findPathButton, &QPushButton::clicked, this, &MainWindow::findShortestPath);
     pathLayout->addWidget(findPathButton);
-    
-    QPushButton *resetButton = new QPushButton("Reset", pathGroup);
+
+    auto *resetButton = new QPushButton("Reset", pathGroup);
     connect(resetButton, &QPushButton::clicked, this, &MainWindow::handleResetAll);
     pathLayout->addWidget(resetButton);
-    
+
     controlLayout->addWidget(pathGroup);
-    
+
     // Output text area
-    QGroupBox *outputGroup = new QGroupBox("Results", controlPanel);
-    QVBoxLayout *outputLayout = new QVBoxLayout(outputGroup);
-    
+    auto *outputGroup = new QGroupBox("Results", controlPanel);
+    auto *outputLayout = new QVBoxLayout(outputGroup);
+
     outputTextEdit = new QTextEdit(outputGroup);
     outputTextEdit->setReadOnly(true);
     outputLayout->addWidget(outputTextEdit);
     
     controlLayout->addWidget(outputGroup);
-    
+
+    // Add theme toggle button at the end of control panel
+    themeToggleButton = new QPushButton("Toggle Light Mode", controlPanel);
+    themeToggleButton->setToolTip("Toggle between light and dark mode (Ctrl+T)");
+    themeToggleButton->setStyleSheet(
+        "QPushButton {"
+        "  padding: 8px; font-size: 12px;"
+        "  background-color: #404040;"
+        "  color: white;"
+        "  border: 1px solid #666;"
+        "  border-radius: 4px;"
+        "}"
+        "QPushButton:hover {"
+        "  background-color: #505050;"
+        "  border-color: #888;"
+        "}"
+        "QPushButton:pressed {"
+        "  background-color: #353535;"
+        "}"
+    );
+    connect(themeToggleButton, &QPushButton::clicked, this, &MainWindow::toggleTheme);
+    controlLayout->addWidget(themeToggleButton);
+
+    // Add keyboard shortcut for theme toggle (Ctrl+T)
+    auto *themeAction = new QAction("Toggle Theme", this);
+    themeAction->setShortcut(QKeySequence("Ctrl+T"));
+    connect(themeAction, &QAction::triggered, this, &MainWindow::toggleTheme);
+    addAction(themeAction);
+
     // Add to splitter
     // Wrap mapVisualizer in a scroll area
     mainSplitter->addWidget(mapVisualizer);
@@ -214,7 +280,7 @@ void MainWindow::setupUi()
 void MainWindow::loadMapFile()
 {
     timeInMap = 0;
-    QString filePath = QFileDialog::getOpenFileName(this, "Open Map File", "", "Text Files (*.txt)");
+    const QString filePath = QFileDialog::getOpenFileName(this, "Open Map File", "", "Text Files (*.txt)");
     if (filePath.isEmpty()) {
         return;
     }
@@ -249,7 +315,7 @@ void MainWindow::loadMapFile()
 void MainWindow::loadQueriesFile()
 {
     timeInQuery = 0;
-    QString filePath = QFileDialog::getOpenFileName(this, "Open Queries File", "", "Text Files (*.txt)");
+    const QString filePath = QFileDialog::getOpenFileName(this, "Open Queries File", "", "Text Files (*.txt)");
     if (filePath.isEmpty()) {
         return;
     }
@@ -272,39 +338,38 @@ void MainWindow::loadQueriesFile()
     }
 
     currentQueryIndex = 0;
-    Query query = queryList[currentQueryIndex];
-    QString resultText = QString::fromStdString(mapGraph->findShortestPath(query.startX, query.startY, query.endX, query.endY, query.R).resultText);
+    const Query query = queryList[currentQueryIndex];
+    const QString resultText = QString::fromStdString(mapGraph->findShortestPath(query.startX, query.startY, query.endX, query.endY, query.R).resultText);
     displayQuery(query, resultText);
 
     const auto endInQuery = std::chrono::high_resolution_clock::now();
     timeInQuery = std::chrono::duration_cast<std::chrono::milliseconds>(endInQuery - startInQuery).count();
 }
 
-void MainWindow::findShortestPath()
-{
+void MainWindow::findShortestPath() const {
     if (mapGraph->empty()) {
         displayResult("Error: No map loaded.");
         return;
     }
 
     bool ok1, ok2, ok3, ok4;
-    double startX = startXEdit->text().toDouble(&ok1);
-    double startY = startYEdit->text().toDouble(&ok2);
-    double endX = endXEdit->text().toDouble(&ok3);
-    double endY = endYEdit->text().toDouble(&ok4);
+    const double startX = startXEdit->text().toDouble(&ok1);
+    const double startY = startYEdit->text().toDouble(&ok2);
+    const double endX = endXEdit->text().toDouble(&ok3);
+    const double endY = endYEdit->text().toDouble(&ok4);
 
     if (!ok1 || !ok2 || !ok3 || !ok4) {
         displayResult("Invalid coordinate input.");
         return;
     }
 
-    double R = REdit->text().toDouble();
+    const double R = REdit->text().toDouble();
 
-    auto start = std::chrono::high_resolution_clock::now();
-    PathResult pathResult = mapGraph->findShortestPath(startX, startY, endX, endY, R);
-    auto end = std::chrono::high_resolution_clock::now();
+    const auto start = std::chrono::high_resolution_clock::now();
+    const PathResult pathResult = mapGraph->findShortestPath(startX, startY, endX, endY, R);
+    const auto end = std::chrono::high_resolution_clock::now();
 
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
     QString result = QString::fromStdString(pathResult.resultText);
     result += "\nComputation time: " + QString::number(duration) + " ms";
@@ -316,15 +381,14 @@ void MainWindow::findShortestPath()
     mapVisualizer->update();
 }
 
-void MainWindow::onPointsSelected(double startX, double startY, double endX, double endY)
-{
-    double R = REdit->text().toDouble();
-    
-    auto start = std::chrono::high_resolution_clock::now();
-    PathResult pathResult = mapGraph->findShortestPath(startX, startY, endX, endY, R);
-    auto end = std::chrono::high_resolution_clock::now();
-    
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+void MainWindow::onPointsSelected(const double startX, const double startY, const double endX, const double endY) const {
+    const double R = REdit->text().toDouble();
+
+    const auto start = std::chrono::high_resolution_clock::now();
+    const PathResult pathResult = mapGraph->findShortestPath(startX, startY, endX, endY, R);
+    const auto end = std::chrono::high_resolution_clock::now();
+
+    const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     
     QString result = QString::fromStdString(pathResult.resultText);
     result += "\nComputation time: " + QString::number(duration) + " ms";
@@ -386,34 +450,34 @@ void MainWindow::runAllQueries()
     progressDialog.setValue(0);
 
     std::atomic_bool cancel{false};
-    QObject::connect(&progressDialog, &QProgressDialog::canceled, [&]{ cancel = true; });
+    connect(&progressDialog, &QProgressDialog::canceled, [&]{ cancel = true; });
 
-    auto future = QtConcurrent::run([this, &cancel, &progressDialog]() {
+    const auto future = QtConcurrent::run([this, &cancel, &progressDialog]() {
         std::vector<PathResult> localResults;
         localResults.reserve(queryList.size());
-        auto startAll = std::chrono::high_resolution_clock::now();
+        const auto startAll = std::chrono::high_resolution_clock::now();
         for (size_t i = 0; i < queryList.size(); ++i) {
             if (cancel.load()) break;
-            const auto &q = queryList[i];
-            localResults.push_back(mapGraph->findShortestPath(q.startX, q.startY, q.endX, q.endY, q.R));
+            const auto &[startX, startY, endX, endY, R] = queryList[i];
+            localResults.push_back(mapGraph->findShortestPath(startX, startY, endX, endY, R));
             QMetaObject::invokeMethod(&progressDialog, [this, &progressDialog, i]() {
                 progressDialog.setRange(0, static_cast<int>(queryList.size()));
                 progressDialog.setValue(static_cast<int>(i + 1));
                 progressDialog.setLabelText(QString("Processing %1 / %2 ...").arg(static_cast<int>(i + 1)).arg(static_cast<int>(queryList.size())));
             }, Qt::QueuedConnection);
         }
-        auto endAll = std::chrono::high_resolution_clock::now();
+        const auto endAll = std::chrono::high_resolution_clock::now();
         long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(endAll - startAll).count();
         return std::make_pair(elapsed, std::move(localResults));
     });
 
     QFutureWatcher<std::pair<long long, std::vector<PathResult>>> watcher;
-    QObject::connect(&watcher, &QFutureWatcherBase::progressValueChanged, &progressDialog, &QProgressDialog::setValue);
-    QObject::connect(&watcher, &QFutureWatcherBase::progressRangeChanged, &progressDialog, &QProgressDialog::setRange);
-    QObject::connect(&watcher, &QFutureWatcherBase::finished, this, [this, &progressDialog, &watcher]() {
-        auto pair = watcher.result();
-        timeBase = pair.first;
-        auto results = std::move(pair.second);
+    connect(&watcher, &QFutureWatcherBase::progressValueChanged, &progressDialog, &QProgressDialog::setValue);
+    connect(&watcher, &QFutureWatcherBase::progressRangeChanged, &progressDialog, &QProgressDialog::setRange);
+    connect(&watcher, &QFutureWatcherBase::finished, this, [this, &progressDialog, &watcher]() {
+        auto [fst, snd] = watcher.result();
+        timeBase = fst;
+        const auto results = std::move(snd);
 
         saveResults("Output/outputs.txt", results);
 
@@ -499,8 +563,7 @@ void MainWindow::showLoading(const QString &message)
     QApplication::processEvents();
 }
 
-void MainWindow::hideLoading()
-{
+void MainWindow::hideLoading() const {
     if (loadingOverlay) loadingOverlay->hide();
 }
 
@@ -513,4 +576,70 @@ void MainWindow::resizeEvent(QResizeEvent *event)
     }
 }
 
+void MainWindow::toggleTheme() {
+    if (mapVisualizer) {
+        mapVisualizer->toggleTheme();
+        updateTheme();
+    }
+}
 
+void MainWindow::updateTheme() {
+    QString stylesheetPath;
+    QPalette palette;
+    // Update button text based on current theme
+    if (mapVisualizer->getCurrentTheme() == AppTheme::Light) {
+        themeToggleButton->setText("Toggle Dark Mode");
+        stylesheetPath = "styles/light_theme.qss";
+        palette.setColor(QPalette::Window, QColor(0xf0f0f0));
+        palette.setColor(QPalette::WindowText, Qt::black);
+    } else {
+        themeToggleButton->setText("Toggle Light Mode");
+        stylesheetPath = "styles/dark_theme.qss";
+        palette.setColor(QPalette::Window, QColor(0x353535));
+        palette.setColor(QPalette::WindowText, Qt::white);
+    }
+
+    QFile styleFile(stylesheetPath);
+    if (styleFile.open(QFile::ReadOnly)) {
+        QString styleSheet = QString::fromLatin1(styleFile.readAll());
+        qApp->setStyleSheet(styleSheet);
+        styleFile.close();
+    } else {
+        qDebug() << "Failed to load stylesheet:" << stylesheetPath;
+        // Fallback to the previous QPalette approach if stylesheets fail
+        if (mapVisualizer->getCurrentTheme() == AppTheme::Dark) {
+            palette.setColor(QPalette::Base, QColor(0x191919));
+            palette.setColor(QPalette::AlternateBase, QColor(0x353535));
+            palette.setColor(QPalette::Text, Qt::white);
+            palette.setColor(QPalette::Button, QColor(0x353535));
+            palette.setColor(QPalette::ButtonText, Qt::white);
+            palette.setColor(QPalette::BrightText, Qt::red);
+            palette.setColor(QPalette::Link, QColor(0x2a82da));
+            palette.setColor(QPalette::Highlight, QColor(0x2a82da));
+            palette.setColor(QPalette::HighlightedText, Qt::black);
+            palette.setColor(QPalette::PlaceholderText, QColor(0xa0a0a0));
+            palette.setColor(QPalette::Shadow, QColor(0x1a1a1a));
+            palette.setColor(QPalette::Light, QColor(0x505050));
+            palette.setColor(QPalette::Midlight, QColor(0x454545));
+            palette.setColor(QPalette::Dark, QColor(0x2a2a2a));
+            palette.setColor(QPalette::Mid, QColor(0x303030));
+        } else {
+            palette.setColor(QPalette::Base, Qt::white);
+            palette.setColor(QPalette::AlternateBase, QColor(0xe9e7e3));
+            palette.setColor(QPalette::Text, Qt::black);
+            palette.setColor(QPalette::Button, QColor(0xf0f0f0));
+            palette.setColor(QPalette::ButtonText, Qt::black);
+            palette.setColor(QPalette::BrightText, Qt::white);
+            palette.setColor(QPalette::Link, QColor(0x0000ff));
+            palette.setColor(QPalette::Highlight, QColor(0x0078d7));
+            palette.setColor(QPalette::HighlightedText, Qt::white);
+            palette.setColor(QPalette::PlaceholderText, QColor(0x787878));
+            palette.setColor(QPalette::Shadow, QColor(0xc0c0c0));
+            palette.setColor(QPalette::Light, Qt::white);
+            palette.setColor(QPalette::Midlight, QColor(0xf8f8f8));
+            palette.setColor(QPalette::Dark, QColor(0xa0a0a0));
+            palette.setColor(QPalette::Mid, QColor(0xd0d0d0));
+        }
+    }
+    QApplication::setPalette(palette);
+}

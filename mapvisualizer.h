@@ -6,7 +6,17 @@
 #include <QMouseEvent>
 #include <QPoint>
 #include <memory>
+#include <QApplication>
+#include <QPalette>
 #include "mapgraph.h"
+
+const double sqrt3 = sqrt(3);
+
+// Theme enum for light/dark mode
+enum class AppTheme {
+    Light,
+    Dark
+};
 
 class MapVisualizer : public QWidget {
     Q_OBJECT
@@ -19,8 +29,11 @@ public:
     void clearSelectionPoints();
     void reset();
     void resetZoom();
-
-    static void resetUIState();
+    
+    // Theme management
+    void setTheme(AppTheme theme);
+    void toggleTheme();
+    [[nodiscard]] AppTheme getCurrentTheme() const { return currentTheme; }
 
     // Getters for selected points
     [[nodiscard]] QPointF getStartPoint() const { return startPoint; }
@@ -46,13 +59,13 @@ protected:
     void wheelEvent(QWheelEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
+
 private:
     double scaleFactor = 1.0;  // Zoom level, default = 100%
     QPoint lastMousePos;
     QPointF offset;        // Offset for panning
     bool isPanning = false;
 
-private:
     std::shared_ptr<MapGraph> mapGraph;
     bool isStartPointSelected;
     QPointF startPoint;
@@ -61,12 +74,15 @@ private:
     // Drawing parameters
     int nodeDiameter;
     int pathThickness;
-    QColor nodeColor;
     QColor edgeColor;
     QColor pathColor;
-    QColor selectedNodeColor;
     QColor startPointColor;
     QColor endPointColor;
+    QColor backgroundColor;
+    
+    // Theme management
+    AppTheme currentTheme;
+    void updateThemeColors();
 
     // Coordinate transformation
     QRectF graphBounds;
@@ -76,4 +92,4 @@ private:
     void clampView();
 };
 
-#endif // MAPVISUALIZER_H 
+#endif // MAPVISUALIZER_H

@@ -6,15 +6,13 @@ MapVisualizer::MapVisualizer(QWidget *parent)
       isStartPointSelected(false),
       nodeDiameter(10),
       pathThickness(3),
-      nodeColor(Qt::blue),
-      edgeColor(Qt::green),
-      pathColor(Qt::red),
-      selectedNodeColor(Qt::green),
       startPointColor(Qt::blue),
-      endPointColor(Qt::magenta) {
+      endPointColor(Qt::red),
+      currentTheme(AppTheme::Dark) {
 
     setMinimumSize(400, 400);
     setMouseTracking(true);
+    updateThemeColors();
 }
 
 MapVisualizer::~MapVisualizer() = default;
@@ -45,6 +43,7 @@ void MapVisualizer::reset() {
     // Reset zoom to default level
     resetZoom();
 }
+
 void MapVisualizer::resetZoom() {
     scaleFactor = 1.0;
     offset = QPointF(0, 0);
@@ -52,10 +51,6 @@ void MapVisualizer::resetZoom() {
     update();
 }
 
-void MapVisualizer::resetUIState() {
-    // No checkboxes or combo-boxes in this class
-    // You can clear internal state flags if needed
-}
 void MapGraph::clearLastPath() {
     lastPath.clear();
 }
@@ -71,17 +66,21 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
     painter.save();  // Save the original painter state
     painter.scale(scaleFactor, scaleFactor);  // Zoom based on user input
 
-    painter.fillRect(rect(), Qt::black);
+    painter.fillRect(rect(), backgroundColor);
     
     if (!mapGraph) {
+        // Set text color based on theme for better contrast
+        painter.setPen(currentTheme == AppTheme::Light ? Qt::black : Qt::white);
         painter.drawText(rect(), Qt::AlignCenter, "No map loaded");
         return;
     }
 
     const std::vector<std::pair<double, double>> nodes = mapGraph->getNodes();
     
-    // Draw edges
-    painter.setPen(QPen(edgeColor, 1/scaleFactor));
+    // Draw edges with theme-appropriate thickness
+    float edgeThickness = (currentTheme == AppTheme::Light) ? 1.5/scaleFactor : 1/scaleFactor;
+    painter.setPen(QPen(edgeColor, edgeThickness));
+    
     for (const auto&[edgeStart, edgeEnd] : mapGraph->getEdges()) {
         const auto&[sourceX, sourceY] = nodes[edgeStart];
         const auto&[destX, destY] = nodes[edgeEnd];
@@ -92,17 +91,20 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
         painter.drawLine(sourcePoint, destPoint);
     }
     
-    //Draw the shortest path if available
+    // Draw the shortest path if available
     if (const auto& path = mapGraph->getLastPath(); !path.empty()) {
-        painter.setPen(QPen(pathColor, pathThickness/scaleFactor));
-        
+        float currentPathThickness = (currentTheme == AppTheme::Light) ? 
+            (pathThickness + 1)/scaleFactor : pathThickness/scaleFactor;
+            
+        painter.setPen(QPen(pathColor, currentPathThickness, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+
         for (size_t i = 0; i < path.size() - 1; ++i) {
             const auto&[sourceX, sourceY] = nodes[path[i]];
             const auto&[destX, destY] = nodes[path[i+1]];
-            
+
             QPointF sourcePoint = transformCoordinates(sourceX, sourceY);
             QPointF destPoint = transformCoordinates(destX, destY);
-            
+
             painter.drawLine(sourcePoint, destPoint);
         }
     }
@@ -119,12 +121,45 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
         painter.setBrush(endPointColor);
         painter.setPen(QPen(Qt::black, 2/scaleFactor));
         const QPointF transformedEnd = transformCoordinates(endPoint.x(), endPoint.y());
-        painter.drawEllipse(transformedEnd, nodeDiameter/scaleFactor, nodeDiameter/scaleFactor);
+        const double radius = (nodeDiameter-4)/scaleFactor;
+        auto *trianglePoints = new QPointF[3];
+        trianglePoints[0] = QPointF(transformedEnd.x()-radius*sqrt3, transformedEnd.y()-radius);
+        trianglePoints[1] = QPointF(transformedEnd.x()+radius*sqrt3, transformedEnd.y()-radius);
+        trianglePoints[2] = QPointF(transformedEnd.x(), transformedEnd.y()+radius*3);
+        painter.drawPolygon(trianglePoints, 3);
+        painter.drawEllipse(QPointF((trianglePoints[0].x()+trianglePoints[1].x())/2, trianglePoints[0].y()), abs(trianglePoints[0].x()-trianglePoints[1].x())/2, abs(trianglePoints[0].x()-trianglePoints[1].x())/4);
+        delete[] trianglePoints;
     }
 
-    painter.restore();  // Restore painter to original state
+    painter.restore();
 }
 
+// Theme management methods
+void MapVisualizer::setTheme(AppTheme theme) {
+    currentTheme = theme;
+    updateThemeColors();
+    update();
+}
+
+void MapVisualizer::toggleTheme() {
+    currentTheme = (currentTheme == AppTheme::Light) ? AppTheme::Dark : AppTheme::Light;
+    updateThemeColors();
+    update();
+}
+
+void MapVisualizer::updateThemeColors() {
+    if (currentTheme == AppTheme::Light) {
+        backgroundColor = Qt::white;
+        edgeColor = QColor(0x003F00);
+        pathColor = Qt::red;
+    } else { // Dark theme
+        backgroundColor = Qt::black;
+        edgeColor = QColor(0x00EF00);
+        pathColor = Qt::cyan;
+    }
+}
+
+// Rest of your existing methods remain the same...
 void MapVisualizer::mousePressEvent(QMouseEvent *event)
 {
     if (!MainWindow::isSelectionEnabled && event->button() == Qt::LeftButton) {
@@ -188,7 +223,7 @@ QPointF MapVisualizer::transformCoordinates(const double x, const double y) cons
     // Scale coordinates to fit in the widget
     const double scaleX = width / graphBounds.width();
     const double scaleY = height / graphBounds.height();
-    
+
     // Use the smaller scale to maintain the aspect ratio
     const double scale = qMin(scaleX, scaleY);
     
@@ -209,7 +244,7 @@ QPointF MapVisualizer::transformCoordinates(const double x, const double y) cons
 QPointF MapVisualizer::inverseTransformCoordinates(const int pixelX, const int pixelY) const {
     // First, remove the offset to get coordinates relative to the original map position
     QPointF adjustedPoint = QPointF(pixelX, pixelY) - offset;
-    
+
     // Then remove the scale factor
     adjustedPoint /= scaleFactor;
     
@@ -224,7 +259,7 @@ QPointF MapVisualizer::inverseTransformCoordinates(const int pixelX, const int p
     // Scale coordinates to fit in the widget
     const double scaleX = width / graphBounds.width();
     const double scaleY = height / graphBounds.height();
-    
+
     // Use the smaller scale to maintain the aspect ratio
     const double scale = qMin(scaleX, scaleY);
     

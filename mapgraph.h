@@ -39,11 +39,11 @@ public:
     ~MapGraph();
     void clearLastPath();
 
-    bool empty();
+    [[nodiscard]] bool empty() const;
     bool loadMapFromFile(const std::string& filename);
     bool loadQueriesFromFile(const std::string& filename);
     PathResult findShortestPath(double startX, double startY, double endX, double endY, double R);
-    std::string displayOutput(const std::vector<PathResult> &results) const;
+    [[nodiscard]] std::string displayOutput(const std::vector<PathResult> &results) const;
 
     std::vector<std::pair<int, double>> findNodesWithinRadius(double x, double y, double R, std::priority_queue<std::pair<double, int>, std::vector<std::
                                                               pair<double, int>>, std::greater<>> &pq, std::vector<double> &time, std::vector<double> &dist) const;
@@ -55,15 +55,12 @@ public:
     std::vector<std::pair<int,int>> getEdges(){return edges;}
     
     // Getters for visualization
-    const std::vector<int>& getLastPath() const { return lastPath; }
-    const std::vector<Query>& getQueries() const { return queries; }
-    
-    // Get closest node to coordinates
-    std::pair<int,double> findClosestNode(double x, double y) const;
+    [[nodiscard]] const std::vector<int>& getLastPath() const { return lastPath; }
+    [[nodiscard]] const std::vector<Query>& getQueries() const { return queries; }
 
 private:
     std::vector<std::vector<std::pair<int, Edge>>> adjacencyList; // node -> [(neighbor, travel_time)]
-    double max_speed;
+    double max_speed{};
 
     // For faster lookups
     std::vector<std::pair<int,int>> edges;
