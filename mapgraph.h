@@ -1,6 +1,7 @@
 #ifndef MAPGRAPH_H
 #define MAPGRAPH_H
 
+#include <qtclasshelpermacros.h>
 #include <vector>
 #include <string>
 #include <queue>
@@ -35,6 +36,9 @@ struct PathResult {
 
 class MapGraph {
 public:
+    // Singleton
+    static MapGraph& instance(){static MapGraph instance; return instance; }
+
     MapGraph();
     ~MapGraph();
     void clearLastPath();
@@ -47,8 +51,6 @@ public:
 
     std::vector<std::pair<int, double>> findNodesWithinRadius(double x, double y, double R, std::priority_queue<std::pair<double, int>, std::vector<std::
                                                               pair<double, int>>, std::greater<>> &pq, std::vector<double> &time, std::vector<double> &dist) const;
-
-    std::vector<PathResult> runAllQueries();
 
     // Get nodes and edges
     std::vector<std::pair<double, double>> getNodes(){return nodePositions;}
@@ -73,6 +75,8 @@ private:
 
     // Helper methods
     static double calculateDistance(double x1, double y1, double x2, double y2) ;
+
+    Q_DISABLE_COPY(MapGraph);
 };
 
 #endif // MAPGRAPH_H

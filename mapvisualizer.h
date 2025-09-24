@@ -22,10 +22,13 @@ class MapVisualizer : public QWidget {
     Q_OBJECT
 
 public:
+    // Singleton
+    static MapVisualizer* instance(){static auto* instance = new MapVisualizer(nullptr);; return instance; }
+
     explicit MapVisualizer(QWidget *parent = nullptr);
     ~MapVisualizer() override;
 
-    void setMapGraph(const std::shared_ptr<MapGraph> &graph);
+    void setMapGraph();
     void clearSelectionPoints();
     void reset();
     void resetZoom();
@@ -40,8 +43,8 @@ public:
     [[nodiscard]] QPointF getEndPoint() const { return endPoint; }
     
     // Setters for points
-    void setStartPoint(double x, double y) { startPoint = QPointF(x, y); update(); }
-    void setEndPoint(double x, double y) { endPoint = QPointF(x, y); update(); }
+    void setStartPoint(const double x, const double y) { startPoint = QPointF(x, y); hasStartPoint = true; update(); }
+    void setEndPoint(const double x, const double y) { endPoint = QPointF(x, y); hasEndPoint = true; update(); }
     
     // Coordinate transformation
     [[nodiscard]] QPointF transformCoordinates(double x, double y) const;
@@ -66,8 +69,7 @@ private:
     QPointF offset;        // Offset for panning
     bool isPanning = false;
 
-    std::shared_ptr<MapGraph> mapGraph;
-    bool isStartPointSelected;
+    bool hasStartPoint, hasEndPoint;
     QPointF startPoint;
     QPointF endPoint;
 
@@ -90,6 +92,8 @@ private:
 
     // Keep scaled content within view
     void clampView();
+
+    Q_DISABLE_COPY(MapVisualizer);
 };
 
 #endif // MAPVISUALIZER_H

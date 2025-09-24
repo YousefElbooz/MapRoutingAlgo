@@ -3,12 +3,13 @@
 
 MapVisualizer::MapVisualizer(QWidget *parent)
     : QWidget(parent),
-      isStartPointSelected(false),
+      hasStartPoint(false), hasEndPoint(false),
       nodeDiameter(10),
       pathThickness(3),
+      pathColor(Qt::red),
       startPointColor(Qt::blue),
       endPointColor(Qt::red),
-      currentTheme(AppTheme::Dark) {
+      currentTheme(AppTheme::Dark)  {
 
     setMinimumSize(400, 400);
     setMouseTracking(true);
@@ -17,18 +18,13 @@ MapVisualizer::MapVisualizer(QWidget *parent)
 
 MapVisualizer::~MapVisualizer() = default;
 
-void MapVisualizer::setMapGraph(const std::shared_ptr<MapGraph> &graph) {
-    mapGraph = graph;
-    
-    if (mapGraph) {
-        calculateGraphBounds();
-    }
-    
+void MapVisualizer::setMapGraph() {
+    calculateGraphBounds();
     update();
 }
 
 void MapVisualizer::clearSelectionPoints() {
-    isStartPointSelected = false;
+    hasStartPoint = hasEndPoint = false;
     startPoint = QPointF();
     endPoint = QPointF();
     update();
@@ -36,10 +32,8 @@ void MapVisualizer::clearSelectionPoints() {
 
 void MapVisualizer::reset() {
     clearSelectionPoints();
-    if (mapGraph) {
-        mapGraph->clearLastPath();
-        calculateGraphBounds();
-    }
+    MapGraph::instance().clearLastPath();
+    calculateGraphBounds();
     // Reset zoom to default level
     resetZoom();
 }
@@ -51,37 +45,25 @@ void MapVisualizer::resetZoom() {
     update();
 }
 
-void MapGraph::clearLastPath() {
-    lastPath.clear();
-}
-
 void MapVisualizer::paintEvent(QPaintEvent *event) {
     Q_UNUSED(event);
     
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
+    painter.fillRect(rect(), backgroundColor);
 
     // Apply zoom (this is the new part)
     painter.translate(offset);
     painter.save();  // Save the original painter state
     painter.scale(scaleFactor, scaleFactor);  // Zoom based on user input
 
-    painter.fillRect(rect(), backgroundColor);
-    
-    if (!mapGraph) {
-        // Set text color based on theme for better contrast
-        painter.setPen(currentTheme == AppTheme::Light ? Qt::black : Qt::white);
-        painter.drawText(rect(), Qt::AlignCenter, "No map loaded");
-        return;
-    }
-
-    const std::vector<std::pair<double, double>> nodes = mapGraph->getNodes();
+    const std::vector<std::pair<double, double>> nodes = MapGraph::instance().getNodes();
     
     // Draw edges with theme-appropriate thickness
-    float edgeThickness = (currentTheme == AppTheme::Light) ? 1.5/scaleFactor : 1/scaleFactor;
+    const double edgeThickness = currentTheme == AppTheme::Light ? 1.5/scaleFactor : 1/scaleFactor;
     painter.setPen(QPen(edgeColor, edgeThickness));
     
-    for (const auto&[edgeStart, edgeEnd] : mapGraph->getEdges()) {
+    for (const auto&[edgeStart, edgeEnd] : MapGraph::instance().getEdges()) {
         const auto&[sourceX, sourceY] = nodes[edgeStart];
         const auto&[destX, destY] = nodes[edgeEnd];
         
@@ -92,8 +74,8 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
     }
     
     // Draw the shortest path if available
-    if (const auto& path = mapGraph->getLastPath(); !path.empty()) {
-        float currentPathThickness = (currentTheme == AppTheme::Light) ? 
+    if (const auto& path = MapGraph::instance().getLastPath(); !path.empty()) {
+        const double currentPathThickness = currentTheme == AppTheme::Light ?
             (pathThickness + 1)/scaleFactor : pathThickness/scaleFactor;
             
         painter.setPen(QPen(pathColor, currentPathThickness, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
@@ -110,14 +92,14 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
     }
 
     // Draw selected points
-    if (startPoint.x() != 0 || startPoint.y() != 0) {
+    if (hasStartPoint) {
         painter.setBrush(startPointColor);
         painter.setPen(QPen(Qt::black, 2/scaleFactor));
         const QPointF transformedStart = transformCoordinates(startPoint.x(), startPoint.y());
         painter.drawEllipse(transformedStart, nodeDiameter/scaleFactor, nodeDiameter/scaleFactor);
     }
 
-    if (endPoint.x() != 0 || endPoint.y() != 0) {
+    if (hasEndPoint) {
         painter.setBrush(endPointColor);
         painter.setPen(QPen(Qt::black, 2/scaleFactor));
         const QPointF transformedEnd = transformCoordinates(endPoint.x(), endPoint.y());
@@ -135,14 +117,14 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
 }
 
 // Theme management methods
-void MapVisualizer::setTheme(AppTheme theme) {
+void MapVisualizer::setTheme(const AppTheme theme) {
     currentTheme = theme;
     updateThemeColors();
     update();
 }
 
 void MapVisualizer::toggleTheme() {
-    currentTheme = (currentTheme == AppTheme::Light) ? AppTheme::Dark : AppTheme::Light;
+    currentTheme = currentTheme == AppTheme::Light ? AppTheme::Dark : AppTheme::Light;
     updateThemeColors();
     update();
 }
@@ -151,15 +133,12 @@ void MapVisualizer::updateThemeColors() {
     if (currentTheme == AppTheme::Light) {
         backgroundColor = Qt::white;
         edgeColor = QColor(0x003F00);
-        pathColor = Qt::red;
     } else { // Dark theme
         backgroundColor = Qt::black;
         edgeColor = QColor(0x00EF00);
-        pathColor = Qt::cyan;
     }
 }
 
-// Rest of your existing methods remain the same...
 void MapVisualizer::mousePressEvent(QMouseEvent *event)
 {
     if (!MainWindow::isSelectionEnabled && event->button() == Qt::LeftButton) {
@@ -184,20 +163,17 @@ void MapVisualizer::mouseMoveEvent(QMouseEvent *event)
 }
 
 void MapVisualizer::mouseReleaseEvent(QMouseEvent *event) {
-    if (!mapGraph) {
-        return;
-    }
-    
     if (MainWindow::isSelectionEnabled) {
         const QPointF clickPoint = inverseTransformCoordinates(event->pos().x(), event->pos().y());
         
-        if (!isStartPointSelected) {
-            startPoint = clickPoint;
-            isStartPointSelected = true;
+        if (!hasStartPoint || hasEndPoint) {
+            setStartPoint(clickPoint.x(), clickPoint.y());
+            hasEndPoint = false;
+            MapGraph::instance().clearLastPath();
             emit startPointSelected(clickPoint.x(), clickPoint.y());
         } else {
-            endPoint = clickPoint;
-            isStartPointSelected = false;
+            setEndPoint(clickPoint.x(), clickPoint.y());
+            hasEndPoint = true;
             emit endPointSelected(clickPoint.x(), clickPoint.y());
             emit pointsSelected(startPoint.x(), startPoint.y(), endPoint.x(), endPoint.y());
         }
@@ -278,7 +254,7 @@ QPointF MapVisualizer::inverseTransformCoordinates(const int pixelX, const int p
 }
 
 void MapVisualizer::calculateGraphBounds() {
-    if (!mapGraph || mapGraph->getNodes().empty()) {
+    if (MapGraph::instance().getNodes().empty()) {
         graphBounds = QRectF(0, 0, 1, 1);
         return;
     }
@@ -288,7 +264,7 @@ void MapVisualizer::calculateGraphBounds() {
     double maxX = std::numeric_limits<double>::lowest();
     double maxY = std::numeric_limits<double>::lowest();
     
-    for (const auto&[x, y] : mapGraph->getNodes()) {
+    for (const auto&[x, y] : MapGraph::instance().getNodes()) {
         minX = qMin(minX, x);
         minY = qMin(minY, y);
         maxX = qMax(maxX, x);
@@ -309,7 +285,7 @@ void MapVisualizer::calculateGraphBounds() {
 
 //Mouse Wheel Zooming function
 void MapVisualizer::wheelEvent(QWheelEvent *event) {
-    const double factor = (event->angleDelta().y() > 0) ? 1.1 : 0.9;
+    const double factor = event->angleDelta().y() > 0 ? 1.1 : 0.9;
 
     // Optional: zoom centered around the cursor
     const QPointF cursorPos = event->position();
@@ -320,7 +296,7 @@ void MapVisualizer::wheelEvent(QWheelEvent *event) {
     scaleFactor = newScale;
 
     const QPointF afterScale = beforeScale * scaleFactor;
-    offset += (cursorPos - offset) - afterScale;
+    offset += cursorPos - offset - afterScale;
 
     clampView();
     update();

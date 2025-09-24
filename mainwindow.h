@@ -34,18 +34,16 @@ private slots:
     void saveResults(const std::string& filename, const std::vector<PathResult>& results);
     void runAllQueries();
     void handleResetAll();
-    void toggleTheme();
-    void updateTheme();
+    void toggleTheme() const;
+    void updateTheme() const;
 
-    static void enableSelection();
+    void toggleButtonThemeUpdate(AppTheme theme) const;
 
 public:
     static bool isSelectionEnabled;
 
 private:
     Ui::MainWindow *ui;
-    std::shared_ptr<MapGraph> mapGraph;
-    MapVisualizer *mapVisualizer{};
     
     QTextEdit *outputTextEdit{};
     QLabel *mapPathLabel{};

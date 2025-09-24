@@ -95,11 +95,6 @@ QLabel {
     background-color: transparent;
 }
 
-QFrame {
-    border: 1px solid #606060;
-    background-color: #353535;
-}
-
 QSplitter::handle {
     background-color: #606060;
     width: 1px;

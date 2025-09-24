@@ -8,6 +8,8 @@
 #include <cmath>
 #include <sstream>
 
+#include "mapvisualizer.h"
+
 MapGraph::MapGraph() = default;
 
 MapGraph::~MapGraph() = default;
@@ -310,6 +312,8 @@ PathResult MapGraph::findShortestPath(double startX, double startY, double endX,
 
     result.resultText = ss.str();
 
+    MapVisualizer::instance()->setStartPoint(startX, startY);
+    MapVisualizer::instance()->setEndPoint(endX, endY);
     return result;
 }
 
@@ -351,29 +355,6 @@ double MapGraph::calculateDistance(const double x1, const double y1, const doubl
     return std::sqrt(std::pow(x2 - x1, 2) + std::pow(y2 - y1, 2));
 }
 
-std::vector<PathResult> MapGraph::runAllQueries() {
-    std::vector<PathResult> results;
-    
-    if (queries.empty()) {
-        return results;
-    }
-    
-    try {
-        results.reserve(queries.size()); // Preallocate to avoid reallocations
-        
-        for (auto [startX, startY, endX, endY, R] : queries) {
-            PathResult result;
-            try {
-                // Compute the actual path by finding the shortest path
-                result = findShortestPath(startX, startY, endX, endY, R);
-            } catch ([[maybe_unused]] const std::exception& e) {
-                result.resultText = "Error: Exception during path finding";
-            }
-            results.push_back(result);
-        }
-    } catch (const std::exception& e) {
-        std::cerr << "Exception during running all queries: " << e.what() << std::endl;
-    }
-    
-    return results;
+void MapGraph::clearLastPath() {
+    lastPath.clear();
 }
