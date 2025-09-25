@@ -75,7 +75,9 @@ private:
     void setupUi();
     void displayResult(const QString &result) const;
     void displayQuery(const Query &query, const QString& resultText) const;
-    void pathFindingTextEdit(const bool noMap);
+    void pathFindingTextEdit(const bool noMap) const;
+
+    void pathFindingTextUpdate(double startX, double startY, double endX, double endY, double R) const;
 
     // Loading overlay helpers
     void showLoading(const QString &message);

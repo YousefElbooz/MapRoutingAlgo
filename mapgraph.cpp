@@ -185,6 +185,7 @@ PathResult MapGraph::findShortestPath(double startX, double startY, double endX,
 
     if (startNodes.empty() || endNodes.empty()) {
         result.resultText = "Error: No reachable intersection within R";
+        MapVisualizer::instance()->reset();
         return result;
     }
 

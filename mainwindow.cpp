@@ -192,7 +192,6 @@ void MainWindow::setupUi()
 
     // Coordinate inputs
     auto *coordsLayout = new QHBoxLayout();
-    const bool noMap = MapGraph::instance().empty();
     startXEdit = new QLineEdit();
     startXEdit->setPlaceholderText("Start X");
     startYEdit = new QLineEdit();
@@ -389,7 +388,7 @@ void MainWindow::onPointsSelected(const double startX, const double startY, cons
     
     QString result = QString::fromStdString(pathResult.resultText);
     result += "\nComputation time: " + QString::number(duration) + " ms";
-    
+    pathFindingTextUpdate(startX, startY, endX, endY, R);
     displayResult(result);
     MapVisualizer::instance()->update();
 }
@@ -502,17 +501,29 @@ void MainWindow::displayResult(const QString &result) const {
 }
 
 void MainWindow::displayQuery(const Query &query, const QString& resultText) const {
-    startXEdit->setText(QString::number(query.startX));
-    startYEdit->setText(QString::number(query.startY));
-    endXEdit->setText(QString::number(query.endX));
-    endYEdit->setText(QString::number(query.endY));
-    REdit->setText(QString::number(query.R));
+    pathFindingTextUpdate(query.startX, query.startY, query.endX, query.endY, query.R);
     queryIndexEdit->setText(QString::number(currentQueryIndex + 1));
 
     MapVisualizer::instance()->setStartPoint(query.startX, query.startY);
     MapVisualizer::instance()->setEndPoint(query.endX, query.endY);
     displayResult(resultText);
     MapVisualizer::instance()->update();
+}
+
+void MainWindow::pathFindingTextEdit(const bool noMap) const {
+    startXEdit->setDisabled(noMap);
+    startYEdit->setDisabled(noMap);
+    endXEdit->setDisabled(noMap);
+    endYEdit->setDisabled(noMap);
+    REdit->setDisabled(noMap);
+}
+
+void MainWindow::pathFindingTextUpdate(const double startX, const double startY, const double endX, const double endY, const double R) const {
+    startXEdit->setText(QString::number(startX));
+    startYEdit->setText(QString::number(startY));
+    endXEdit->setText(QString::number(endX));
+    endYEdit->setText(QString::number(endY));
+    REdit->setText(QString::number(R));
 }
 
 void MainWindow::handleResetAll() {
@@ -560,13 +571,6 @@ void MainWindow::resizeEvent(QResizeEvent *event)
     }
 }
 
-void MainWindow::pathFindingTextEdit(const bool noMap) {
-    startXEdit->setDisabled(noMap);
-    startYEdit->setDisabled(noMap);
-    endXEdit->setDisabled(noMap);
-    endYEdit->setDisabled(noMap);
-    REdit->setDisabled(noMap);
-}
 
 void MainWindow::toggleTheme() const {
     MapVisualizer::instance()->toggleTheme();
