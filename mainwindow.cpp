@@ -195,31 +195,28 @@ void MainWindow::setupUi()
     const bool noMap = MapGraph::instance().empty();
     startXEdit = new QLineEdit();
     startXEdit->setPlaceholderText("Start X");
-    startXEdit->setDisabled(noMap);
     startYEdit = new QLineEdit();
     startYEdit->setPlaceholderText("Start Y");
-    startYEdit->setDisabled(noMap);
     endXEdit = new QLineEdit();
     endXEdit->setPlaceholderText("End X");
-    endXEdit->setDisabled(noMap);
     endYEdit = new QLineEdit();
     endYEdit->setPlaceholderText("End Y");
-    endYEdit->setDisabled(noMap);
+    auto *RLayout = new QHBoxLayout();
+    auto *RLabel = new QLabel("Max Walking Distance (km):", pathGroup);
+    REdit = new QLineEdit(pathGroup);
+    REdit->setText("10000");
+
+    pathFindingTextEdit(MapGraph::instance().empty());
 
     coordsLayout->addWidget(startXEdit);
     coordsLayout->addWidget(startYEdit);
     coordsLayout->addWidget(endXEdit);
     coordsLayout->addWidget(endYEdit);
+    RLayout->addWidget(RLabel);
+    RLayout->addWidget(REdit);
 
     pathLayout->addLayout(coordsLayout);
 
-    auto *RLayout = new QHBoxLayout();
-    auto *RLabel = new QLabel("Max Walking Distance (km):", pathGroup);
-    REdit = new QLineEdit(pathGroup);
-    REdit->setText("10000");
-    REdit->setDisabled(noMap);
-    RLayout->addWidget(RLabel);
-    RLayout->addWidget(REdit);
     pathLayout->addLayout(RLayout);
 
 
@@ -299,6 +296,8 @@ void MainWindow::loadMapFile()
     }
     const auto endInMap = std::chrono::high_resolution_clock::now();
     timeInMap = std::chrono::duration_cast<std::chrono::milliseconds>(endInMap - startInMap).count();
+
+    pathFindingTextEdit(MapGraph::instance().empty());
     hideLoading();
 }
 
@@ -559,6 +558,14 @@ void MainWindow::resizeEvent(QResizeEvent *event)
         loadingOverlay->setGeometry(rect());
         loadingLabel->setGeometry(0, 0, loadingOverlay->width(), loadingOverlay->height());
     }
+}
+
+void MainWindow::pathFindingTextEdit(const bool noMap) {
+    startXEdit->setDisabled(noMap);
+    startYEdit->setDisabled(noMap);
+    endXEdit->setDisabled(noMap);
+    endYEdit->setDisabled(noMap);
+    REdit->setDisabled(noMap);
 }
 
 void MainWindow::toggleTheme() const {
