@@ -60,7 +60,7 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
     const std::vector<std::pair<double, double>> nodes = MapGraph::instance().getNodes();
     
     // Draw edges with theme-appropriate thickness
-    const double edgeThickness = currentTheme == AppTheme::Light ? 1.5/scaleFactor : 1/scaleFactor;
+    const double edgeThickness = 1/scaleFactor;
     painter.setPen(QPen(edgeColor, edgeThickness));
     
     for (const auto&[edgeStart, edgeEnd] : MapGraph::instance().getEdges()) {
@@ -75,8 +75,7 @@ void MapVisualizer::paintEvent(QPaintEvent *event) {
     
     // Draw the shortest path if available
     if (const auto& path = MapGraph::instance().getLastPath(); !path.empty()) {
-        const double currentPathThickness = currentTheme == AppTheme::Light ?
-            (pathThickness + 1)/scaleFactor : pathThickness/scaleFactor;
+        const double currentPathThickness = pathThickness/scaleFactor;
             
         painter.setPen(QPen(pathColor, currentPathThickness, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
 
